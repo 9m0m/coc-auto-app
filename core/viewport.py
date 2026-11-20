@@ -29,7 +29,7 @@ EMULATOR_TITLE_KEYWORDS = [
     "nox",
     "mumu", "nemu",
     "memu",
-    "clash of critters", "critters", "coc",
+    "clash of critters", "critters",
 ]
 
 
@@ -107,6 +107,16 @@ def find_emulator_window() -> Optional[gw.Window]:
 
             title = (w.title or "").strip()
             title_lower = title.lower()
+
+            # LOAI BO CHINH CUA SO CUA APP DE KHONG TU NHAN DIEN MINH
+            if "coc auto master" in title_lower or "auto master" in title_lower:
+                continue
+
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value == os.getpid():
+                continue
+
             proc_name = get_process_name_by_hwnd(hwnd)
 
             title_matched = any(k in title_lower for k in EMULATOR_TITLE_KEYWORDS)

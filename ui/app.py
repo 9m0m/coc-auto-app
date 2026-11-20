@@ -229,14 +229,20 @@ class AutoApp(ctk.CTk):
 
         # Quét ADB
         serial = self.adb.auto_connect()
-        if serial:
-            screen_sz = self.adb.screen_size or (0, 0)
+        if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
+            screen_sz = self.adb.screen_size
             self.lbl_status_icon.configure(text="🟢")
             self.lbl_status_text.configure(text=f"Đã kết nối: {title}")
             self.lbl_device_detail.configure(
                 text=f"Port: {serial} | Android: {screen_sz[0]}x{screen_sz[1]} | Win: {self.game_vp[2]}x{self.game_vp[3]}"
             )
             self.log(f"Đã kết nối thành công tới {title} ({serial}) - Kích thước: {screen_sz[0]}x{screen_sz[1]}")
+        elif serial:
+            self.lbl_status_icon.configure(text="🟡")
+            self.lbl_status_text.configure(text=f"Thấy cửa sổ: {title} (Cần bật ADB)")
+            self.lbl_device_detail.configure(text="Hãy bật 'Cầu gỡ lỗi Android (ADB)' trong Cài đặt BlueStacks")
+            self.log(f"[CHÚ Ý] Đã thấy cửa sổ '{title}' nhưng ADB bị từ chối kết nối (Android: 0x0).")
+            self.log("👉 Vui lòng vào BlueStacks: Bánh răng Cài đặt -> Cài đặt nâng cao -> BẬT 'Cầu gỡ lỗi Android (ADB)' rồi bấm 'Lưu thay đổi'.")
         else:
             self.lbl_status_icon.configure(text="🟡")
             self.lbl_status_text.configure(text=f"Thấy cửa sổ: {title} (Chưa kết nối ADB)")
