@@ -45,6 +45,17 @@ class AutoApp(ctk.CTk):
         # Tự động quét giả lập khi vừa mở app
         self.after(300, self.refresh_connection)
 
+        # Đăng ký sự kiện tắt app để dọn dẹp sạch sẽ
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        """Dọn dẹp tiến trình ADB ngầm khi tắt app để không bị kẹt file tạm."""
+        try:
+            self.adb.run_cmd(["kill-server"], timeout=1.0)
+        except Exception:
+            pass
+        self.destroy()
+
     def _build_header(self):
         """Tiêu đề ứng dụng."""
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
