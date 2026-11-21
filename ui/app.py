@@ -1,20 +1,23 @@
 """
-Giao diện người dùng đồ họa (GUI) cho COC Auto App bằng CustomTkinter.
-Thiết kế Dark Mode hiện đại, trực quan, dành cho cả người dùng non-code.
+Giao diện người dùng đồ họa Glass UI hiện đại cho COC AutoMaster.
+Thiết kế tối giản, loại bỏ chữ thừa, cân bằng kích thước nút bấm, thẩm mỹ cao.
 """
 
 import sys
 import os
 import time
 import threading
-from typing import Optional
+from typing import Optional, Tuple
 
 import customtkinter as ctk
 
 from core.viewport import setup_windows_environment, find_emulator_window, get_game_viewport, screen_to_android
 from core.adb_manager import ADBManager
+from modules.rally import run_rally_loop
+from modules.fishing import run_fishing_loop
+from modules.adventure import run_adventure_loop
 
-# Cấu hình giao diện
+# Cấu hình giao diện chuẩn Dark Glass
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -23,281 +26,488 @@ class AutoApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Cài đặt cửa sổ chính
-        self.title("COC Auto Master - Hybrid Edition (Không Chiếm Chuột)")
-        self.geometry("560x650")
+        # Thiết lập cửa sổ chính
+        self.title("COC AutoMaster")
+        self.geometry("520x640")
         self.resizable(False, False)
+        self.configure(fg_color="#0a0e17")  # Nền tối sâu sang trọng
 
-        # Trạng thái hệ thống
+        # Quản lý hệ thống & tiến trình
         self.adb = ADBManager()
         self.emulator_win = None
-        self.game_vp = None
+        self.game_vp: Optional[Tuple[int, int, int, int]] = None
+
+        self.worker_thread: Optional[threading.Thread] = None
+        self.stop_event = threading.Event()
         self.is_running = False
         self.selected_mode = "rally"
 
-        # Thiết lập bố cục
+        # Khởi tạo các thành phần giao diện
         self._build_header()
-        self._build_status_card()
-        self._build_mode_selector()
-        self._build_control_buttons()
+        self._build_device_card()
+        self._build_mode_card()
+        self._build_action_controls()
         self._build_log_console()
 
-        # Tự động quét giả lập khi vừa mở app
-        self.after(300, self.refresh_connection)
+        # Phím tắt F1 (Bắt đầu) / F2 (Tạm dừng)
+        self.bind("<F1>", lambda e: self.start_auto())
+        self.bind("<F2>", lambda e: self.stop_auto())
 
-        # Đăng ký sự kiện tắt app để dọn dẹp sạch sẽ
+        # Đăng ký đóng ứng dụng an toàn
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    def on_closing(self):
-        """Dọn dẹp tiến trình ADB ngầm khi tắt app để không bị kẹt file tạm."""
-        try:
-            self.adb.run_cmd(["kill-server"], timeout=1.0)
-        except Exception:
-            pass
-        self.destroy()
+        # Tự động quét giả lập khi mở app
+        self.after(300, self.refresh_connection)
 
     def _build_header(self):
-        """Tiêu đề ứng dụng."""
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=(15, 5))
+        """Header tối giản, tinh tế, không chữ thừa."""
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=24, pady=(18, 10))
 
-        title_label = ctk.CTkLabel(
-            header_frame,
-            text="CLASH OF CRITTERS AUTO",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            text_color="#38bdf8",
-        )
-        title_label.pack(anchor="w")
-
-        subtitle_label = ctk.CTkLabel(
-            header_frame,
-            text="Công nghệ Hybrid: Nhận diện siêu tốc + Click ngầm 100% không giật chuột",
-            font=ctk.CTkFont(size=12),
-            text_color="#94a3b8",
-        )
-        subtitle_label.pack(anchor="w")
-
-    def _build_status_card(self):
-        """Khung trạng thái kết nối giả lập và ADB."""
-        card = ctk.CTkFrame(self, corner_radius=10, fg_color="#1e293b")
-        card.pack(fill="x", padx=20, pady=10)
-
-        top_row = ctk.CTkFrame(card, fg_color="transparent")
-        top_row.pack(fill="x", padx=15, pady=(10, 5))
-
-        self.lbl_status_icon = ctk.CTkLabel(
-            top_row, text="🔴", font=ctk.CTkFont(size=14)
-        )
-        self.lbl_status_icon.pack(side="left", padx=(0, 8))
-
-        self.lbl_status_text = ctk.CTkLabel(
-            top_row,
-            text="Đang tìm kiếm giả lập...",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            text_color="#e2e8f0",
-        )
-        self.lbl_status_text.pack(side="left")
-
-        btn_rescan = ctk.CTkButton(
-            top_row,
-            text="🔄 Quét lại",
-            width=80,
-            height=28,
-            font=ctk.CTkFont(size=12),
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self.refresh_connection,
-        )
-        btn_rescan.pack(side="right")
-
-        # Hàng chi tiết thiết bị & nút test
-        bottom_row = ctk.CTkFrame(card, fg_color="transparent")
-        bottom_row.pack(fill="x", padx=15, pady=(0, 10))
-
-        self.lbl_device_detail = ctk.CTkLabel(
-            bottom_row,
-            text="Cửa sổ: Chưa rõ | ADB: Chưa kết nối",
-            font=ctk.CTkFont(size=11),
-            text_color="#94a3b8",
-        )
-        self.lbl_device_detail.pack(side="left")
-
-        self.btn_test_click = ctk.CTkButton(
-            bottom_row,
-            text="🎯 Test Click Thử",
-            width=110,
-            height=28,
-            font=ctk.CTkFont(size=12),
-            fg_color="#0284c7",
-            hover_color="#0369a1",
-            command=self.test_single_click,
-        )
-        self.btn_test_click.pack(side="right")
-
-    def _build_mode_selector(self):
-        """Khung chọn tính năng Auto."""
-        card = ctk.CTkFrame(self, corner_radius=10, fg_color="#1e293b")
-        card.pack(fill="x", padx=20, pady=5)
+        # Tiêu đề ứng dụng
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left")
 
         title = ctk.CTkLabel(
-            card,
-            text="CHỌN TÍNH NĂNG HOẠT ĐỘNG",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            title_box,
+            text="COC AutoMaster",
+            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
+            text_color="#f8fafc",
+        )
+        title.pack(side="left")
+
+        badge = ctk.CTkLabel(
+            title_box,
+            text="HYBRID",
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            fg_color="#1e293b",
+            text_color="#38bdf8",
+            corner_radius=6,
+            padx=8,
+            pady=2,
+        )
+        badge.pack(side="left", padx=10)
+
+        # Nhãn trạng thái không chiếm chuột
+        sub_tag = ctk.CTkLabel(
+            header,
+            text="100% Không Chiếm Chuột",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color="#64748b",
+        )
+        sub_tag.pack(side="right")
+
+    def _build_device_card(self):
+        """Card trạng thái giả lập phong cách Glass UI với nút bấm cân bằng."""
+        self.card_device = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color="#111827",
+            border_width=1,
+            border_color="#1f293d",
+        )
+        self.card_device.pack(fill="x", padx=24, pady=6)
+
+        # Dòng 1: Đèn báo & Tên giả lập
+        status_row = ctk.CTkFrame(self.card_device, fg_color="transparent")
+        status_row.pack(fill="x", padx=16, pady=(12, 4))
+
+        self.lbl_status_dot = ctk.CTkLabel(
+            status_row,
+            text="●",
+            font=ctk.CTkFont(size=14),
+            text_color="#f59e0b",
+        )
+        self.lbl_status_dot.pack(side="left", padx=(0, 6))
+
+        self.lbl_emulator_name = ctk.CTkLabel(
+            status_row,
+            text="Đang tìm kiếm giả lập...",
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            text_color="#f1f5f9",
+        )
+        self.lbl_emulator_name.pack(side="left")
+
+        # Dòng 2: Thông số kỹ thuật (Cổng & Độ phân giải)
+        self.lbl_details = ctk.CTkLabel(
+            self.card_device,
+            text="Cổng: Đang dò • Màn hình: Đang đọc",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color="#94a3b8",
+            anchor="w",
         )
-        title.pack(anchor="w", padx=15, pady=(10, 5))
+        self.lbl_details.pack(fill="x", padx=16, pady=(0, 10))
 
-        self.seg_mode = ctk.CTkSegmentedButton(
-            card,
-            values=["⚔️ Auto Rally", "🎣 Auto Câu Cá", "🗺️ Auto Phiêu Lưu"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            command=self._on_mode_change,
+        # Dòng 3: 2 Nút thao tác kích thước cân bằng 50/50
+        action_row = ctk.CTkFrame(self.card_device, fg_color="transparent")
+        action_row.pack(fill="x", padx=16, pady=(0, 14))
+
+        self.btn_rescan = ctk.CTkButton(
+            action_row,
+            text="🔄 Quét Lại",
+            height=34,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            corner_radius=8,
+            command=self.refresh_connection,
         )
-        self.seg_mode.set("⚔️ Auto Rally")
-        self.seg_mode.pack(fill="x", padx=15, pady=(0, 15))
+        self.btn_rescan.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
-    def _build_control_buttons(self):
-        """Nút bấm Bắt đầu / Tạm dừng to rõ."""
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=20, pady=10)
+        self.btn_test = ctk.CTkButton(
+            action_row,
+            text="🎯 Test Click",
+            height=34,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            corner_radius=8,
+            command=self.test_single_click,
+        )
+        self.btn_test.pack(side="right", fill="x", expand=True, padx=(6, 0))
+
+    def _build_mode_card(self):
+        """Card chọn tính năng Auto trực quan, rõ ràng, không lỗi font."""
+        card_mode = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color="#111827",
+            border_width=1,
+            border_color="#1f293d",
+        )
+        card_mode.pack(fill="x", padx=24, pady=6)
+
+        # Tiêu đề Card
+        lbl_card_title = ctk.CTkLabel(
+            card_mode,
+            text="CHỌN TÍNH NĂNG",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#64748b",
+            anchor="w",
+        )
+        lbl_card_title.pack(fill="x", padx=16, pady=(12, 8))
+
+        # 3 Nút bấm riêng biệt cân bằng, không dùng segmented button để tránh lỗi font glyph
+        mode_btn_box = ctk.CTkFrame(card_mode, fg_color="transparent")
+        mode_btn_box.pack(fill="x", padx=14, pady=(0, 10))
+
+        self.btn_mode_rally = ctk.CTkButton(
+            mode_btn_box,
+            text="⚔️ Rally",
+            height=38,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            border_width=1,
+            border_color="#38bdf8",
+            corner_radius=8,
+            command=lambda: self._select_mode("rally"),
+        )
+        self.btn_mode_rally.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        self.btn_mode_fishing = ctk.CTkButton(
+            mode_btn_box,
+            text="🎣 Câu Cá",
+            height=38,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            corner_radius=8,
+            text_color="#94a3b8",
+            command=lambda: self._select_mode("fishing"),
+        )
+        self.btn_mode_fishing.pack(side="left", fill="x", expand=True, padx=4)
+
+        self.btn_mode_adventure = ctk.CTkButton(
+            mode_btn_box,
+            text="🧭 Phiêu Lưu",
+            height=38,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+            corner_radius=8,
+            text_color="#94a3b8",
+            command=lambda: self._select_mode("adventure"),
+        )
+        self.btn_mode_adventure.pack(side="left", fill="x", expand=True, padx=(4, 0))
+
+        # Thanh chỉ báo trạng thái kích hoạt rõ ràng
+        desc_box = ctk.CTkFrame(card_mode, fg_color="#0d1424", corner_radius=6)
+        desc_box.pack(fill="x", padx=14, pady=(0, 12))
+
+        self.lbl_mode_status = ctk.CTkLabel(
+            desc_box,
+            text="🎯 Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#38bdf8",
+            padx=10,
+            pady=6,
+        )
+        self.lbl_mode_status.pack()
+
+    def _select_mode(self, mode: str):
+        """Xử lý chuyển đổi tính năng và cập nhật giao diện trực quan."""
+        if self.is_running:
+            return
+
+        self.selected_mode = mode
+
+        # Đặt lại màu cho cả 3 nút
+        inactive_cfg = {
+            "fg_color": "#1e293b",
+            "hover_color": "#334155",
+            "border_color": "#334155",
+            "text_color": "#94a3b8",
+        }
+        active_cfg = {
+            "fg_color": "#0284c7",
+            "hover_color": "#0369a1",
+            "border_color": "#38bdf8",
+            "text_color": "#ffffff",
+        }
+
+        self.btn_mode_rally.configure(**inactive_cfg)
+        self.btn_mode_fishing.configure(**inactive_cfg)
+        self.btn_mode_adventure.configure(**inactive_cfg)
+
+        if mode == "rally":
+            self.btn_mode_rally.configure(**active_cfg)
+            self.lbl_mode_status.configure(
+                text="🎯 Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)"
+            )
+            self.log("Chuyển chế độ: ⚔️ Auto Rally")
+        elif mode == "fishing":
+            self.btn_mode_fishing.configure(**active_cfg)
+            self.lbl_mode_status.configure(
+                text="🎯 Đang chọn: Auto Câu Cá (Tự Động Kéo Cá Theo Rãnh Vàng)"
+            )
+            self.log("Chuyển chế độ: 🎣 Auto Câu Cá")
+        elif mode == "adventure":
+            self.btn_mode_adventure.configure(**active_cfg)
+            self.lbl_mode_status.configure(
+                text="🎯 Đang chọn: Auto Phiêu Lưu (Tự Vượt Ải Mê Cung Cổ Vật)"
+            )
+            self.log("Chuyển chế độ: 🧭 Auto Phiêu Lưu")
+
+    def _build_action_controls(self):
+        """2 Nút Bắt đầu / Tạm dừng đồng đều 50/50, chuẩn đẹp."""
+        btn_box = ctk.CTkFrame(self, fg_color="transparent")
+        btn_box.pack(fill="x", padx=24, pady=8)
 
         self.btn_start = ctk.CTkButton(
-            btn_frame,
+            btn_box,
             text="▶ BẮT ĐẦU (F1)",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            height=46,
+            height=44,
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             fg_color="#10b981",
             hover_color="#059669",
-            command=self.toggle_start_stop,
+            corner_radius=8,
+            command=self.start_auto,
         )
-        self.btn_start.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.btn_start.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         self.btn_stop = ctk.CTkButton(
-            btn_frame,
+            btn_box,
             text="⏸ TẠM DỪNG (F2)",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            height=46,
+            height=44,
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             fg_color="#ef4444",
             hover_color="#dc2626",
+            corner_radius=8,
             command=self.stop_auto,
             state="disabled",
         )
-        self.btn_stop.pack(side="right", fill="x", expand=True, padx=(8, 0))
+        self.btn_stop.pack(side="right", fill="x", expand=True, padx=(6, 0))
 
     def _build_log_console(self):
-        """Bảng hiển thị thông tin log theo thời gian thực."""
-        log_frame = ctk.CTkFrame(self, corner_radius=10, fg_color="#0f172a")
-        log_frame.pack(fill="both", expand=True, padx=20, pady=(5, 15))
+        """Khung Console nhật ký phong cách Glass Terminal."""
+        log_box = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color="#070c18",
+            border_width=1,
+            border_color="#1f293d",
+        )
+        log_box.pack(fill="both", expand=True, padx=24, pady=(4, 16))
 
-        log_title = ctk.CTkLabel(
-            log_frame,
-            text="NHẬT KÝ HOẠT ĐỘNG (LOG)",
-            font=ctk.CTkFont(size=11, weight="bold"),
+        # Tiêu đề log + nút xoá
+        log_top = ctk.CTkFrame(log_box, fg_color="transparent")
+        log_top.pack(fill="x", padx=12, pady=(8, 4))
+
+        lbl_log = ctk.CTkLabel(
+            log_top,
+            text="NHẬT KÝ HOẠT ĐỘNG",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color="#64748b",
         )
-        log_title.pack(anchor="w", padx=12, pady=(8, 2))
+        lbl_log.pack(side="left")
+
+        btn_clear = ctk.CTkButton(
+            log_top,
+            text="Xóa",
+            width=48,
+            height=20,
+            font=ctk.CTkFont(family="Segoe UI", size=10),
+            fg_color="transparent",
+            hover_color="#1e293b",
+            text_color="#94a3b8",
+            command=self.clear_log,
+        )
+        btn_clear.pack(side="right")
 
         self.txt_log = ctk.CTkTextbox(
-            log_frame,
+            log_box,
             font=ctk.CTkFont(family="Consolas", size=11),
-            fg_color="#020617",
+            fg_color="#030712",
             text_color="#38bdf8",
-            corner_radius=6,
+            corner_radius=8,
+            wrap="word",
         )
-        self.txt_log.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.txt_log.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
     def log(self, msg: str):
-        """Ghi log vào ô hiển thị và tự động cuộn xuống cuối."""
-        t_str = time.strftime("%H:%M:%S")
-        full_line = f"[{t_str}] {msg}\n"
-        self.txt_log.insert("end", full_line)
+        """Ghi log kèm mốc thời gian."""
+        timestamp = time.strftime("%H:%M:%S")
+        self.txt_log.insert("end", f"[{timestamp}] {msg}\n")
         self.txt_log.see("end")
 
-    def _on_mode_change(self, value: str):
-        if "Rally" in value:
-            self.selected_mode = "rally"
-        elif "Câu Cá" in value:
-            self.selected_mode = "fishing"
-        elif "Phiêu Lưu" in value:
-            self.selected_mode = "adventure"
-        self.log(f"Đã chuyển sang chế độ: {value}")
+    def clear_log(self):
+        self.txt_log.delete("1.0", "end")
 
     def refresh_connection(self):
-        """Quét và kết nối lại tới cửa sổ giả lập và ADB."""
-        self.log("Đang quét cửa sổ giả lập và cổng ADB...")
+        """Quét cửa sổ game và kết nối cổng ADB tự động."""
+        self.log("Đang quét giả lập và kết nối ADB...")
         self.emulator_win = find_emulator_window()
 
         if not self.emulator_win:
-            self.lbl_status_icon.configure(text="🔴")
-            self.lbl_status_text.configure(text="Chưa tìm thấy giả lập nào đang mở!")
-            self.lbl_device_detail.configure(text="Hãy bật BlueStacks hoặc LDPlayer lên trước.")
-            self.log("[Cảnh báo] Không tìm thấy cửa sổ giả lập nào trên màn hình.")
+            self.lbl_status_dot.configure(text_color="#ef4444")
+            self.lbl_emulator_name.configure(text="Chưa tìm thấy giả lập!")
+            self.lbl_details.configure(text="Vui lòng mở BlueStacks 5 hoặc LDPlayer lên trước.")
+            self.log("[Cảnh báo] Chưa tìm thấy cửa sổ giả lập trên màn hình.")
             return
 
         hwnd = self.emulator_win._hWnd
         title = self.emulator_win.title
         self.game_vp = get_game_viewport(hwnd, title)
 
-        # Quét ADB
         serial = self.adb.auto_connect()
         if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
-            screen_sz = self.adb.screen_size
-            self.lbl_status_icon.configure(text="🟢")
-            self.lbl_status_text.configure(text=f"Đã kết nối: {title}")
-            self.lbl_device_detail.configure(
-                text=f"Port: {serial} | Android: {screen_sz[0]}x{screen_sz[1]} | Win: {self.game_vp[2]}x{self.game_vp[3]}"
+            sz = self.adb.screen_size
+            self.lbl_status_dot.configure(text_color="#10b981")  # Xanh ngọc kết nối thành công
+            self.lbl_emulator_name.configure(text=f"{title}")
+            self.lbl_details.configure(
+                text=f"Cổng: {serial} • Android: {sz[0]}x{sz[1]} • Viewport: {self.game_vp[2]}x{self.game_vp[3]}"
             )
-            self.log(f"Đã kết nối thành công tới {title} ({serial}) - Kích thước: {screen_sz[0]}x{screen_sz[1]}")
+            self.log(f"Đã kết nối thành công: {title} ({serial})")
         elif serial:
-            self.lbl_status_icon.configure(text="🟡")
-            self.lbl_status_text.configure(text=f"Thấy cửa sổ: {title} (Cần bật ADB)")
-            self.lbl_device_detail.configure(text="Hãy bật 'Cầu gỡ lỗi Android (ADB)' trong Cài đặt BlueStacks")
-            self.log(f"[CHÚ Ý] Đã thấy cửa sổ '{title}' nhưng ADB bị từ chối kết nối (Android: 0x0).")
-            self.log("👉 Vui lòng vào BlueStacks: Bánh răng Cài đặt -> Cài đặt nâng cao -> BẬT 'Cầu gỡ lỗi Android (ADB)' rồi bấm 'Lưu thay đổi'.")
+            self.lbl_status_dot.configure(text_color="#f59e0b")
+            self.lbl_emulator_name.configure(text=f"{title} (Cần bật ADB)")
+            self.lbl_details.configure(text="Hãy bật 'Cầu gỡ lỗi Android' trong Cài đặt BlueStacks.")
+            self.log("Cửa sổ giả lập sẵn sàng nhưng ADB chưa mở. Hãy kiểm tra Cài đặt -> Nâng cao.")
         else:
-            self.lbl_status_icon.configure(text="🟡")
-            self.lbl_status_text.configure(text=f"Thấy cửa sổ: {title} (Chưa kết nối ADB)")
-            self.lbl_device_detail.configure(text="Đang thử tìm lại cổng ADB...")
-            self.log(f"Phát hiện cửa sổ '{title}' nhưng chưa mở được cổng kết nối ADB.")
+            self.lbl_status_dot.configure(text_color="#f59e0b")
+            self.lbl_emulator_name.configure(text=f"{title} (Đang dò cổng)")
+            self.lbl_details.configure(text="Đang thử các cổng ADB khác...")
 
     def test_single_click(self):
-        """Thử nghiệm click 1 điểm vào tâm màn hình giả lập mà không chiếm chuột."""
+        """Chạm ngầm thử một phát vào tâm game để kiểm tra phản hồi."""
         if not self.adb.active_serial or not self.game_vp or not self.adb.screen_size:
             self.log("[Lỗi] Chưa kết nối được ADB hoặc chưa tìm thấy khung game để test.")
             return
 
-        def _do_test():
-            self.log("Chuẩn bị test click ngầm vào tâm màn hình trong 2 giây...")
-            time.sleep(2)
-            center_x = self.game_vp[0] + self.game_vp[2] // 2
-            center_y = self.game_vp[1] + self.game_vp[3] // 2
-            ax, ay = screen_to_android(center_x, center_y, self.game_vp, self.adb.screen_size)
-            self.log(f"Đang gửi lệnh chạm ngầm tới tọa độ Android ({ax}, {ay})...")
+        def _worker():
+            self.log("Chuẩn bị test click ngầm vào tâm màn hình trong 1 giây...")
+            time.sleep(1)
+            cx = self.game_vp[0] + self.game_vp[2] // 2
+            cy = self.game_vp[1] + self.game_vp[3] // 2
+            ax, ay = screen_to_android(cx, cy, self.game_vp, self.adb.screen_size)
             ok = self.adb.tap(ax, ay)
             if ok:
-                self.log("✅ [THÀNH CÔNG] Đã chạm ngầm vào game! Chuột Windows không bị di chuyển.")
+                self.log(f"✅ [THÀNH CÔNG] Đã chạm ngầm vào game (Android: {ax}, {ay})! Chuột không di chuyển.")
             else:
-                self.log("❌ [THẤT BẠI] Lệnh chạm ADB không thành công.")
+                self.log("❌ Lệnh chạm không gửi được.")
 
-        threading.Thread(target=_do_test, daemon=True).start()
+        threading.Thread(target=_worker, daemon=True).start()
 
-    def toggle_start_stop(self):
-        """Bật / Tắt trạng thái Auto."""
-        if not self.is_running:
-            self.is_running = True
-            self.btn_start.configure(text="ĐANG CHẠY...", fg_color="#64748b", state="disabled")
-            self.btn_stop.configure(state="normal")
-            self.log(f"🚀 BẮT ĐẦU chạy chế độ: {self.seg_mode.get()}")
-            # Sẽ kết nối trực tiếp với module logic game tương ứng tại đây
-        else:
-            self.stop_auto()
+    def get_current_viewport(self) -> Optional[Tuple[int, int, int, int]]:
+        """Lấy kích thước viewport mới nhất của giả lập."""
+        if not self.emulator_win:
+            self.emulator_win = find_emulator_window()
+        if self.emulator_win:
+            self.game_vp = get_game_viewport(self.emulator_win._hWnd, self.emulator_win.title)
+            return self.game_vp
+        return None
+
+    def start_auto(self):
+        """Khởi động luồng chạy Auto theo chế độ đã chọn."""
+        if self.is_running:
+            return
+
+        if not self.adb.active_serial:
+            self.log("[Lỗi] Chưa kết nối được ADB tới giả lập. Bấm 'Quét Lại' để thử lại.")
+            return
+
+        self.is_running = True
+        self.stop_event.clear()
+
+        self.btn_start.configure(text="ĐANG CHẠY...", fg_color="#334155", state="disabled")
+        self.btn_stop.configure(state="normal")
+        self.btn_mode_rally.configure(state="disabled")
+        self.btn_mode_fishing.configure(state="disabled")
+        self.btn_mode_adventure.configure(state="disabled")
+
+        mode = self.selected_mode
+        mode_names = {"rally": "⚔️ Auto Rally", "fishing": "🎣 Auto Câu Cá", "adventure": "🧭 Auto Phiêu Lưu"}
+        self.log(f"🚀 BẮT ĐẦU CHẠY: {mode_names.get(mode, mode)}")
+
+        def _runner():
+            try:
+                if mode == "rally":
+                    run_rally_loop(self.adb, self.get_current_viewport, self.stop_event, self.log)
+                elif mode == "fishing":
+                    run_fishing_loop(self.adb, self.get_current_viewport, self.stop_event, self.log)
+                elif mode == "adventure":
+                    run_adventure_loop(self.adb, self.get_current_viewport, self.stop_event, self.log)
+            except Exception as e:
+                self.log(f"[Lỗi tiến trình] {e}")
+            finally:
+                self.after(0, self._on_worker_finished)
+
+        self.worker_thread = threading.Thread(target=_runner, daemon=True)
+        self.worker_thread.start()
 
     def stop_auto(self):
-        """Dừng Auto."""
+        """Yêu cầu dừng tiến trình Auto an toàn."""
+        if not self.is_running:
+            return
+
+        self.log("Đang yêu cầu dừng tiến trình...")
+        self.stop_event.set()
+
+    def _on_worker_finished(self):
+        """Khôi phục trạng thái nút bấm khi auto dừng."""
         self.is_running = False
         self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#10b981", state="normal")
         self.btn_stop.configure(state="disabled")
-        self.log("⏹ ĐÃ TẠM DỪNG Auto.")
+        self.btn_mode_rally.configure(state="normal")
+        self.btn_mode_fishing.configure(state="normal")
+        self.btn_mode_adventure.configure(state="normal")
+        self.log("⏹ Đã dừng hoạt động.")
+
+    def on_closing(self):
+        """Đóng ứng dụng và giải phóng sạch daemon adb."""
+        self.stop_event.set()
+        try:
+            self.adb.run_cmd(["kill-server"], timeout=1.0)
+        except Exception:
+            pass
+        self.destroy()
 
 
 def run():
