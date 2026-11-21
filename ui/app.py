@@ -45,7 +45,7 @@ class HelpDialog(ctk.CTkToplevel):
         self._build_content()
 
         # 3. Tính toán vị trí căn giữa cửa sổ cha và đặt kích thước
-        width, height = 480, 570
+        width, height = 480, 585
         try:
             x = max(0, parent.winfo_x() + (parent.winfo_width() - width) // 2)
             y = max(0, parent.winfo_y() + (parent.winfo_height() - height) // 2)
@@ -97,7 +97,8 @@ class HelpDialog(ctk.CTkToplevel):
         txt1 = (
             "• BlueStacks 5: Cài đặt -> Nâng cao -> Bật Cầu gỡ lỗi Android (ADB)\n"
             "• LDPlayer / MuMu / Nox: Bật kết nối ADB (nếu đã bật sẵn thì giữ nguyên)\n"
-            "• Độ phân giải khuyến nghị: 1600 x 900 hoặc 1280 x 720 (16:9)"
+            "• Game màn hình dọc: Khuyến nghị 900x1600 hoặc 720x1280 (Phone mode)\n"
+            "  (Hỗ trợ tự động đồng bộ kể cả khi giả lập đang để chế độ Tablet ngang)"
         )
         ctk.CTkLabel(
             f1, text=txt1, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"

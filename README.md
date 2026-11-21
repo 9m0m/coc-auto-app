@@ -88,8 +88,9 @@ Khi bật tính năng này, ứng dụng Auto có thể gửi tín hiệu chạm
    - Tránh kéo cửa sổ game nằm lơ lửng ở ranh giới giữa hai màn hình vì Windows sẽ chia cắt tọa độ pixel.
    - Giữ nguyên tỉ lệ hiển thị (Windows Display Scaling) ở mức đồng nhất (khuyến nghị 100%).
 
-3. **Độ phân giải & Tỉ lệ khung hình:**
-   - Khuyến nghị thiết lập màn hình giả lập ở độ phân giải 1600 x 900 hoặc 1280 x 720 (Landscape tỉ lệ 16:9).
+3. **Độ phân giải & Tỉ lệ khung hình (Khổ màn hình dọc):**
+   - Clash of Critters là tựa game màn hình dọc (Portrait). Khuyến nghị thiết lập màn hình giả lập ở chế độ **Điện thoại (Phone): 900 x 1600 hoặc 720 x 1280 (tỉ lệ 9:16)**.
+   - **Tự động thích ứng:** Nếu giả lập của bạn đang để chế độ Máy tính bảng (Tablet màn ngang như 1600 x 900 hoặc 1280 x 720), ứng dụng đã tích hợp cơ chế tự động xoay và đồng bộ tọa độ (Orientation Auto-Align) nên bot vẫn nhận diện và click chuẩn 100%, bạn không cần phải đổi lại cấu hình giả lập.
    - Toàn bộ tọa độ trong bot được tính toán theo tỉ lệ tương đối (Relative Ratio), tự động co giãn theo kích thước khung hình game.
    - Tránh dùng chuột co kéo thay đổi kích thước cửa sổ game khi bot đang trong trận kéo cá minigame.
 
