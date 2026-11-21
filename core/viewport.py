@@ -24,13 +24,21 @@ EMULATOR_PROCESS_KEYWORDS = [
 ]
 
 EMULATOR_TITLE_KEYWORDS = [
-    "bluestacks", "app player",
+    "bluestacks",
     "ldplayer",
-    "nox",
+    "noxplayer", "nox",
     "mumu", "nemu",
     "memu",
-    "clash of critters", "critters",
 ]
+
+# Danh sách đen loại trừ tuyệt đối các ứng dụng Windows thông thường
+# Tránh trường hợp tab trình duyệt YouTube, Cốc Cốc, Discord có tên chứa từ khóa
+EXCLUDED_PROCESSES = {
+    "discord.exe", "chrome.exe", "msedge.exe", "browser.exe", "coccoc.exe",
+    "firefox.exe", "brave.exe", "opera.exe", "spotify.exe", "telegram.exe",
+    "viber.exe", "devenv.exe", "code.exe", "explorer.exe", "taskmgr.exe",
+    "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe", "steam.exe"
+}
 
 
 def setup_windows_environment() -> None:
@@ -118,11 +126,17 @@ def find_emulator_window() -> Optional[gw.Window]:
                 continue
 
             proc_name = get_process_name_by_hwnd(hwnd)
+            if proc_name in EXCLUDED_PROCESSES:
+                continue
+
+            # Chặn triệt để các ứng dụng web/chat electron (Discord, Chrome, Cốc Cốc, Edge...)
+            if any(b in proc_name for b in ["chrome", "discord", "browser", "edge", "firefox", "electron"]):
+                continue
 
             title_matched = any(k in title_lower for k in EMULATOR_TITLE_KEYWORDS)
             proc_matched = any(k in proc_name for k in EMULATOR_PROCESS_KEYWORDS)
 
-            if title_matched or proc_matched:
+            if proc_matched or title_matched:
                 area = width * height
                 is_foreground = 1 if (hwnd == fore_hwnd) else 0
                 candidates.append((is_foreground, area, w, proc_name, title))
