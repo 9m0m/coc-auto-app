@@ -33,25 +33,30 @@ class HelpDialog(ctk.CTkToplevel):
 
     def __init__(self, parent):
         super().__init__(parent)
+
+        # 1. Ẩn cửa sổ ngay khi khởi tạo để loại bỏ 100% hiện tượng chớp trắng trên Windows
+        self.withdraw()
+
         self.title("Hướng Dẫn Sử Dụng & Lưu Ý")
-        self.geometry("480x570")
         self.resizable(False, False)
         self.configure(fg_color="#0c1017")
 
-        # Cố định luôn ở trên cửa sổ chính và chặn tương tác phía sau cho tới khi đóng
-        self.transient(parent)
-        self.grab_set()
+        # 2. Xây dựng toàn bộ nội dung Dark Mode trước khi hiện ra
+        self._build_content()
 
-        # Căn giữa so với cửa sổ cha
-        self.update_idletasks()
+        # 3. Tính toán vị trí căn giữa cửa sổ cha và đặt kích thước
+        width, height = 480, 570
         try:
-            x = parent.winfo_x() + (parent.winfo_width() - 480) // 2
-            y = parent.winfo_y() + (parent.winfo_height() - 570) // 2
-            self.geometry(f"+{max(0, x)}+{max(0, y)}")
+            x = max(0, parent.winfo_x() + (parent.winfo_width() - width) // 2)
+            y = max(0, parent.winfo_y() + (parent.winfo_height() - height) // 2)
+            self.geometry(f"{width}x{height}+{x}+{y}")
         except Exception:
-            pass
+            self.geometry(f"{width}x{height}")
 
-        # Đồng bộ màu thanh tiêu đề Windows 11
+        # 4. Cố định luôn ở trên cửa sổ chính
+        self.transient(parent)
+
+        # 5. Đồng bộ màu thanh tiêu đề Windows 11 với màu nền Dark Slate
         if pywinstyles is not None:
             try:
                 pywinstyles.change_header_color(self, color="#0c1017")
@@ -59,7 +64,16 @@ class HelpDialog(ctk.CTkToplevel):
             except Exception:
                 pass
 
-        self._build_content()
+        # 6. Đợi 15ms cho Windows áp dụng trọn vẹn màu tiêu đề rồi mới hiển thị mượt mà (Zero Flicker)
+        self.after(15, self._show_smooth)
+
+    def _show_smooth(self):
+        try:
+            self.deiconify()
+            self.grab_set()
+            self.focus_force()
+        except Exception:
+            pass
 
     def _build_content(self):
         # Tiêu đề Popup
@@ -238,8 +252,11 @@ class AutoApp(ctk.CTk):
         self.btn_help.pack(side="right")
 
     def open_help_dialog(self):
-        """Mở cửa sổ Hướng dẫn sử dụng."""
-        HelpDialog(self)
+        """Mở cửa sổ Hướng dẫn sử dụng (chống mở đè nhiều cửa sổ)."""
+        if hasattr(self, "_help_dlg") and self._help_dlg is not None and self._help_dlg.winfo_exists():
+            self._help_dlg.focus_force()
+            return
+        self._help_dlg = HelpDialog(self)
 
     def _setup_global_hotkey(self):
         """Đăng ký phím tắt toàn cục F8 qua thư viện keyboard."""
