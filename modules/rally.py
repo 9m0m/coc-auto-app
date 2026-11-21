@@ -204,15 +204,32 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         _last_clicked_tile = None
         return True, joined_any
 
-    # 2. Type B & C & "Ảo Ảnh": Có nút Back thực sự ở góc trái
+    # 2. Type D: Bảng mỏ vàng phe ta (chỉ bấm nút [X] ở đáy khi xác nhận có thanh quân phòng thủ xanh > 1500px)
+    crop_green_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.72), int(gw_w * 0.15):int(gw_w * 0.85)]
+    hsv_bar = cv2.cvtColor(crop_green_bar, cv2.COLOR_BGR2HSV)
+    green_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (35, 100, 100), (85, 255, 255))))
+
+    crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
+    w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
+    x_white_px = int(np.count_nonzero(w_x_mask))
+
+    if green_bar_px > 1500 and x_white_px > 100:
+        close_x = int(gw_l + gw_w * 0.50)
+        close_y = int(gw_t + gw_h * 0.955)
+        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất đồng minh (Nút X)", log_cb)
+        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        _last_clicked_tile = None
+        return True, False
+
+    # 3. Type B & C & "Ảo Ảnh": Có nút Back thực sự ở góc trái
     back_x = int(gw_l + gw_w * config.RALLY_POPUP_BACK_X)
     back_y = int(gw_t + gw_h * config.RALLY_POPUP_BACK_Y)
     crop_back = screen_crop[max(0, int(gw_h * 0.90)):min(gw_h, int(gw_h * 0.97)), max(0, int(gw_w * 0.04)):min(gw_w, int(gw_w * 0.14))]
     w_mask = (crop_back[:, :, 0] > 180) & (crop_back[:, :, 1] > 180) & (crop_back[:, :, 2] > 180)
     white_px = int(np.count_nonzero(w_mask))
     mean_val = np.mean(crop_back) if crop_back.size > 0 else 255.0
-    # Nút Back thật: Nút tròn màu xám đậm (mean < 130) mang mũi tên trắng rõ nét (300 <= white_px <= 1500), loại trừ 100% Mapview
-    has_back_btn = (300 <= white_px <= 1500 and mean_val < 130.0)
+    # Nút Back thật: Nút tròn màu tím/xám đậm (mean < 140) mang mũi tên trắng rõ nét (200 <= white_px <= 2500), loại trừ 100% Mapview
+    has_back_btn = (200 <= white_px <= 2500 and mean_val < 140.0)
 
     if has_back_btn:
         bx1, bx2 = int(gw_w * 0.52), int(gw_w * 0.92)
@@ -254,14 +271,6 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
 
         # Không có nút hành động nào khác -> Đây là bảng "Ảo Ảnh" / Bảng xếp hạng cứ điểm (có nút Back)
         _adb_tap(adb, vp, back_x, back_y, "Đóng bảng Ảo Ảnh/Cứ điểm về Map", log_cb)
-        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
-        _last_clicked_tile = None
-        return True, False
-
-    # 3. Type D: Bảng thông tin mỏ vàng
-    crop_pill = screen_crop[int(gw_h * 0.61):int(gw_h * 0.66), int(gw_w * 0.03):int(gw_w * 0.30)]
-    if crop_pill.size > 0 and np.mean(crop_pill) < 90.0:
-        _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
         _last_clicked_tile = None
         return True, False
