@@ -26,14 +26,16 @@ _last_clicked_tile: Optional[Tuple[int, int]] = None
 _effective_vp: Optional[Tuple[int, int, int, int]] = None
 _last_raw_vp: Optional[Tuple[int, int, int, int]] = None
 _last_pillarbox_check: float = 0.0
+_consecutive_reward_claims: int = 0
 
 
 def reset_rally_state() -> None:
     """Xóa sạch bộ nhớ tạm và cooldown khi bắt đầu phiên chạy mới."""
-    global _full_tiles_cooldown, _recently_joined_tiles, _last_clicked_tile
+    global _full_tiles_cooldown, _recently_joined_tiles, _last_clicked_tile, _consecutive_reward_claims
     _full_tiles_cooldown.clear()
     _recently_joined_tiles.clear()
     _last_clicked_tile = None
+    _consecutive_reward_claims = 0
 
 
 def _sleep(seconds: float, stop_event: threading.Event, jitter: bool = True) -> bool:
@@ -103,6 +105,17 @@ def _is_tile_in_dict(tile: Tuple[int, int], target_dict: Dict[Tuple[int, int], f
 
 
 def _check_and_claim_reward(sct: mss.MSS, vp: Tuple[int, int, int, int], adb: ADBManager, stop_event: threading.Event, log_cb: Optional[Callable[[str], None]] = None) -> bool:
+    global _consecutive_reward_claims
+    if stop_event.is_set():
+        return False
+
+    # Cơ chế Failsafe: Tránh loop bấm nhận quà liên tiếp do nhận diện nhầm chi tiết màn hình
+    if _consecutive_reward_claims >= 2:
+        if log_cb:
+            log_cb("Đã bấm nhận quà 2 lần liên tiếp -> Tự động chuyển tiếp để chống kẹt")
+        _consecutive_reward_claims = 0
+        return False
+
     gw_l, gw_t, gw_w, gw_h = vp
     x1 = int(gw_l + gw_w * config.RALLY_REWARD_BTN_REL_X_MIN)
     x2 = int(gw_l + gw_w * config.RALLY_REWARD_BTN_REL_X_MAX)
@@ -114,17 +127,21 @@ def _check_and_claim_reward(sct: mss.MSS, vp: Tuple[int, int, int, int], adb: AD
         return False
 
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(
-        hsv,
-        np.array(config.HSV_RALLY_GREEN_LOWER, dtype=np.uint8),
-        np.array(config.HSV_RALLY_GREEN_UPPER, dtype=np.uint8),
-    )
-    if int(np.count_nonzero(mask)) > 300:
+    lower_green = np.array(getattr(config, "HSV_RALLY_REWARD_GREEN_LOWER", [40, 110, 110]), dtype=np.uint8)
+    upper_green = np.array(getattr(config, "HSV_RALLY_REWARD_GREEN_UPPER", [80, 255, 255]), dtype=np.uint8)
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+
+    px_count = int(np.count_nonzero(mask))
+    threshold = getattr(config, "RALLY_REWARD_PX_THRESHOLD", 2000)
+    if px_count >= threshold:
         cx = int(gw_l + gw_w * config.RALLY_CLAIM_REWARD_X)
         cy = int(gw_t + gw_h * config.RALLY_CLAIM_REWARD_Y)
         _adb_tap(adb, vp, cx, cy, "Nhận quà Rally", log_cb)
+        _consecutive_reward_claims += 1
         _sleep(config.RALLY_DELAY_AFTER_CLAIM_REWARD, stop_event)
         return True
+
+    _consecutive_reward_claims = 0
     return False
 
 
@@ -187,7 +204,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         _last_clicked_tile = None
         return True, joined_any
 
-    # 2. Type B & C: Có nút Back ở góc trái
+    # 2. Type B & C & "Ảo Ảnh": Có nút Back ở góc trái
     back_x = int(gw_l + gw_w * config.RALLY_POPUP_BACK_X)
     back_y = int(gw_t + gw_h * config.RALLY_POPUP_BACK_Y)
     crop_back = screen_crop[max(0, int(gw_h * 0.91)):min(gw_h, int(gw_h * 0.97)), max(0, int(gw_w * 0.04)):min(gw_w, int(gw_w * 0.14))]
@@ -208,7 +225,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _adb_tap(adb, vp, back_x, back_y, "Đóng bảng tấn công đất", log_cb)
             _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
             _last_clicked_tile = None
-            return False, False
+            return True, False
 
         if green_px > 1500:
             join_btn_x = int(gw_l + gw_w * 0.72)
@@ -232,13 +249,29 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, False
 
-    # 3. Type D: Bảng thông tin mỏ vàng
-    crop_pill = screen_crop[int(gw_h * 0.61):int(gw_h * 0.66), int(gw_w * 0.03):int(gw_w * 0.30)]
-    if crop_pill.size > 0 and np.mean(crop_pill) < 90.0:
-        _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất", log_cb)
+        # Không phải Rally cũng không phải Tấn công (ví dụ: Bảng "Ảo Ảnh", Bảng xếp hạng cứ điểm, Chi tiết cứ điểm)
+        _adb_tap(adb, vp, back_x, back_y, "Đóng bảng Ảo Ảnh/Cứ điểm về Map", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
         _last_clicked_tile = None
-        return False, False
+        return True, False
+
+    # 3. Type D: Bảng thông tin mỏ vàng / ô đất bị chọn (có nút [X] ở đáy màn hình)
+    crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
+    has_close_x = False
+    if crop_close_x.size > 0:
+        w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
+        has_close_x = (int(np.count_nonzero(w_x_mask)) >= 50 and np.mean(crop_close_x) < 120.0)
+
+    crop_pill = screen_crop[int(gw_h * 0.61):int(gw_h * 0.66), int(gw_w * 0.03):int(gw_w * 0.30)]
+    has_pill = (crop_pill.size > 0 and np.mean(crop_pill) < 90.0)
+
+    if has_close_x or has_pill:
+        deselect_x = int(gw_l + gw_w * getattr(config, "RALLY_TILE_DESELECT_X", 0.50))
+        deselect_y = int(gw_t + gw_h * getattr(config, "RALLY_TILE_DESELECT_Y", 0.955))
+        _adb_tap(adb, vp, deselect_x, deselect_y, "Bỏ chọn ô đất (Nút X)", log_cb)
+        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        _last_clicked_tile = None
+        return True, False
 
     return False, False
 
@@ -432,19 +465,19 @@ def run_rally_loop(
             ensure_map_overview(sct, vp, adb, stop_event, None)
             continue
 
-        # 2. Quét và bấm Rally
+        # 2. Kiểm tra và dọn dẹp popup tồn đọng / ô đất bị chọn / bảng Ảo Ảnh
+        is_pop, is_join = _handle_rally_detail_popup(sct, vp, adb, stop_event, log_cb)
+        if is_pop:
+            if is_join:
+                log_cb("Đã tham gia Rally từ popup tồn đọng!")
+            _sleep(0.5, stop_event)
+            continue
+
+        # 3. Quét và bấm Rally trên Mapview
         result = scan_and_join_map_rallies(sct, vp, adb, stop_event, log_cb)
         if result == "JOINED":
             log_cb("Đã tham gia Rally thành công! Đang chờ lượt quét tiếp theo...")
             _sleep(1.5, stop_event)
-            continue
-
-        # 3. Kiểm tra popup tồn đọng (tránh kẹt nếu popup bị mở sẵn)
-        is_pop, is_join = _handle_rally_detail_popup(sct, vp, adb, stop_event, log_cb)
-        if is_pop:
-            if is_join:
-                log_cb("Đã xử lý popup tồn đọng & tham gia Rally!")
-            _sleep(0.5, stop_event)
             continue
 
         _sleep(getattr(config, "RALLY_SCAN_INTERVAL", config.RALLY_DELAY_IDLE_SLEEP), stop_event)

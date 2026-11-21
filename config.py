@@ -119,6 +119,15 @@ RALLY_REWARD_BTN_REL_X_MAX: float = 0.650
 RALLY_REWARD_BTN_REL_Y_MIN: float = 0.800
 RALLY_REWARD_BTN_REL_Y_MAX: float = 0.880
 
+# Ngưỡng pixel & dải màu cho nút "Xác Nhận" nhận quà (Chống nhận diện nhầm viền thẻ/thanh máu)
+HSV_RALLY_REWARD_GREEN_LOWER = [40, 110, 110]
+HSV_RALLY_REWARD_GREEN_UPPER = [80, 255, 255]
+RALLY_REWARD_PX_THRESHOLD: int = 2000
+
+# Toạ độ nút đóng [X] ở đáy màn hình khi ô đất hoặc mỏ tài nguyên bị chọn
+RALLY_TILE_DESELECT_X: float = 0.500
+RALLY_TILE_DESELECT_Y: float = 0.955
+
 # C. Toạ độ tỉ lệ Màn hình Chat Phe Vàng
 # Vùng quét các nút "Tham gia" màu xanh lá trong khung chat
 CHAT_MESSAGES_REL_X_MIN: float = 0.320
