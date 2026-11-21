@@ -61,6 +61,28 @@ def _adb_tap(adb: ADBManager, vp: Tuple[int, int, int, int], win_x: int, win_y: 
     adb.tap(ax, ay)
 
 
+def _adb_swipe(
+    adb: ADBManager,
+    vp: Tuple[int, int, int, int],
+    win_x1: int,
+    win_y1: int,
+    win_x2: int,
+    win_y2: int,
+    duration_ms: int = 280,
+    desc: str = "",
+    log_cb: Optional[Callable[[str], None]] = None,
+):
+    """Chuyển đổi tọa độ Windows -> Android và vuốt ngầm qua ADB."""
+    if not adb or not adb.active_serial:
+        return
+    screen_sz = adb.screen_size or (720, 1280)
+    ax1, ay1 = screen_to_android(win_x1, win_y1, vp, screen_sz)
+    ax2, ay2 = screen_to_android(win_x2, win_y2, vp, screen_sz)
+    if desc and log_cb:
+        log_cb(f"-> {desc} (Android vuốt: ({ax1}, {ay1}) -> ({ax2}, {ay2}))")
+    adb.swipe(ax1, ay1, ax2, ay2, duration_ms)
+
+
 def _detect_pillarbox(sample_bgr: np.ndarray) -> Tuple[int, int]:
     """Phát hiện viền đen hai bên của màn hình mobile trên PC."""
     gray = cv2.cvtColor(sample_bgr, cv2.COLOR_BGR2GRAY)
@@ -161,25 +183,28 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     is_multi_sheet = (tab.size > 0 and top_dim.size > 0 and np.mean(tab) < 75.0 and np.mean(top_dim) < 70.0)
 
     if is_multi_sheet:
-        bx1, bx2 = int(gw_w * 0.55), int(gw_w * 0.95)
-        by1, by2 = int(gw_h * 0.22), int(gw_h * 0.85)
-        card_crop = screen_crop[by1:by2, bx1:bx2]
-        hsv_cards = cv2.cvtColor(card_crop, cv2.COLOR_BGR2HSV)
-
-        green_mask = cv2.inRange(hsv_cards, np.array([35, 100, 100]), np.array([85, 255, 255]))
-        contours_g, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        green_btns = []
-        min_btn_w = int(gw_w * 0.16)
-        for c in contours_g:
-            cx, cy, bw, bh = cv2.boundingRect(c)
-            if bw >= min_btn_w and 18 <= bh <= 55:
-                green_btns.append((bx1 + cx + bw // 2, by1 + cy + bh // 2))
-        green_btns.sort(key=lambda b: b[1])
+        def _get_green_btns(img_crop):
+            bx1, bx2 = int(gw_w * 0.55), int(gw_w * 0.95)
+            by1, by2 = int(gw_h * 0.22), int(gw_h * 0.85)
+            card_crop = img_crop[by1:by2, bx1:bx2]
+            hsv_cards = cv2.cvtColor(card_crop, cv2.COLOR_BGR2HSV)
+            green_mask = cv2.inRange(hsv_cards, np.array([35, 100, 100]), np.array([85, 255, 255]))
+            contours_g, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            btns = []
+            min_btn_w = int(gw_w * 0.16)
+            for c in contours_g:
+                cx, cy, bw, bh = cv2.boundingRect(c)
+                if bw >= min_btn_w and 18 <= bh <= 55:
+                    btns.append((bx1 + cx + bw // 2, by1 + cy + bh // 2))
+            btns.sort(key=lambda b: b[1])
+            return btns
 
         joined_any = False
         cooldown_time = getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
+
+        # Nhịp 1: Quét và tham gia các Rally ở trang đầu (Rally 1 -> 4)
+        green_btns = _get_green_btns(screen_crop)
         if green_btns:
-            # Lần lượt tham gia tất cả các Rally còn slot xanh trong danh sách (xử lý chồng Rally)
             for idx, (btn_x, btn_y) in enumerate(green_btns):
                 if stop_event.is_set():
                     break
@@ -187,15 +212,33 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
                 joined_any = True
                 _sleep(0.35, stop_event)
 
+        # Vuốt cuộn trang lên để hiển thị các Rally thứ 5, 6... bị tràn bên dưới
+        swipe_x = int(gw_l + gw_w * 0.50)
+        swipe_y1 = int(gw_t + gw_h * 0.72)
+        swipe_y2 = int(gw_t + gw_h * 0.28)
+        _adb_swipe(adb, vp, swipe_x, swipe_y1, swipe_x, swipe_y2, 280, "Cuộn xem thêm Rally phía dưới", log_cb)
+        _sleep(0.40, stop_event)
+
+        # Nhịp 2: Quét lại sau khi cuộn để bấm các Rally mới lộ ra
+        screen_crop2 = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+        if screen_crop2 is not None:
+            green_btns_p2 = _get_green_btns(screen_crop2)
+            if green_btns_p2:
+                for idx, (btn_x, btn_y) in enumerate(green_btns_p2):
+                    if stop_event.is_set():
+                        break
+                    _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally bổ sung {idx+1}/{len(green_btns_p2)}", log_cb)
+                    joined_any = True
+                    _sleep(0.35, stop_event)
+
+        if joined_any:
             if _last_clicked_tile is not None:
                 _recently_joined_tiles[_last_clicked_tile] = time.time() + cooldown_time
-            if _sleep(0.3, stop_event):
-                return True, True
         else:
             if _last_clicked_tile is not None:
-                _full_tiles_cooldown[_last_clicked_tile] = time.time() + config.RALLY_FULL_TILE_COOLDOWN
+                _full_tiles_cooldown[_last_clicked_tile] = time.time() + getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
                 if log_cb:
-                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(config.RALLY_FULL_TILE_COOLDOWN)}s")
+                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(getattr(config, 'RALLY_FULL_TILE_COOLDOWN', 30.0))}s")
 
         safe_close_x = int(gw_l + gw_w * 0.50)
         safe_close_y = int(gw_t + gw_h * 0.12)
@@ -338,26 +381,6 @@ def scan_and_join_map_rallies(
 
         if _is_tile_in_dict(tile, _recently_joined_tiles) or _is_tile_in_dict(tile, _full_tiles_cooldown):
             continue
-
-        ay1 = y + cur_th
-        ay2 = min(map_crop.shape[0], y + cur_th + int(gw_h * 0.08))
-        ax1 = max(0, x - 10)
-        ax2 = min(map_crop.shape[1], x + cur_tw + 10)
-        avatar_crop = map_crop[ay1:ay2, ax1:ax2]
-
-        if avatar_crop.size > 0:
-            a_hsv = cv2.cvtColor(avatar_crop, cv2.COLOR_BGR2HSV)
-            joined_mask = cv2.inRange(
-                a_hsv,
-                np.array(config.HSV_RALLY_JOINED_GREEN_LOWER, dtype=np.uint8),
-                np.array(config.HSV_RALLY_JOINED_GREEN_UPPER, dtype=np.uint8),
-            )
-            joined_px = int(np.count_nonzero(joined_mask))
-            if joined_px >= config.RALLY_JOINED_PX_THRESHOLD:
-                if log_cb:
-                    log_cb(f"Ô ({click_x}, {click_y}) đã có huy hiệu 'Đã tham gia' ({joined_px}px) -> Bỏ qua")
-                _recently_joined_tiles[tile] = time.time() + getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
-                continue
 
         _last_clicked_tile = tile
         if log_cb:

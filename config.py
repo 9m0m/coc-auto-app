@@ -153,8 +153,8 @@ HSV_RALLY_JOINED_GREEN_UPPER = [85, 255, 255]
 RALLY_JOINED_PX_THRESHOLD: int = 300
 
 # Ngưỡng nhận diện Template Matching tiêu đề 'Tổng Tấn Công!' trên Mapview
-# (Giá trị thật: 0.78 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.43. Ngưỡng 0.62 bắt nhạy đa mùa 100% không bắt nhầm)
-RALLY_MATCH_THRESHOLD: float = 0.62
+# (Giá trị thật: 0.78 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.43. Ngưỡng 0.55 bắt nhạy cả khi bubble bị đè/che khuất)
+RALLY_MATCH_THRESHOLD: float = 0.55
 # Dải tỷ lệ quét đa năng của game mobile dọc (hỗ trợ mọi kích cỡ cửa sổ từ thu nhỏ đến cực đại 1080p/2K)
 RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92, 1.12, 0.88, 0.80, 0.72, 0.67, 1.20, 1.28]
 
@@ -192,8 +192,8 @@ RALLY_DELAY_AFTER_SCROLL_CLICK: float = 0.40
 RALLY_DELAY_IDLE_SLEEP: float = 0.40
 RALLY_SCAN_INTERVAL: float = 0.40
 
-# Thời gian khóa bỏ qua ô đã đầy (4/4) trên Mapview
-RALLY_FULL_TILE_COOLDOWN: float = 60.0
+# Thời gian khóa bỏ qua ô đã đầy trên Mapview (Đồng bộ 30s để kiểm tra lại các Rally mới nổ)
+RALLY_FULL_TILE_COOLDOWN: float = 30.0
 
 # Thời gian chờ kiểm tra lại ô đất vừa tham gia (hỗ trợ bắt các Rally xuất hiện tiếp theo trên cùng ô)
 RALLY_JOINED_COOLDOWN: float = 30.0
