@@ -190,6 +190,9 @@ RALLY_SCAN_INTERVAL: float = 0.40
 # Thời gian khóa bỏ qua ô đã đầy (4/4) trên Mapview
 RALLY_FULL_TILE_COOLDOWN: float = 60.0
 
+# Thời gian chờ kiểm tra lại ô đất vừa tham gia (hỗ trợ bắt các Rally xuất hiện tiếp theo trên cùng ô)
+RALLY_JOINED_COOLDOWN: float = 30.0
+
 # Chế độ hoạt động: False = Focus 100% Tổng Mapview (Khuyên dùng); True = Quét cả Chat
 RALLY_ENABLE_CHAT_SCAN: bool = False
 

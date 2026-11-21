@@ -28,9 +28,19 @@ _last_raw_vp: Optional[Tuple[int, int, int, int]] = None
 _last_pillarbox_check: float = 0.0
 
 
-def _sleep(seconds: float, stop_event: threading.Event) -> bool:
-    """Nghỉ có thể ngắt ngay lập tức khi stop_event được set."""
-    deadline = time.time() + seconds
+def reset_rally_state() -> None:
+    """Xóa sạch bộ nhớ tạm và cooldown khi bắt đầu phiên chạy mới."""
+    global _full_tiles_cooldown, _recently_joined_tiles, _last_clicked_tile
+    _full_tiles_cooldown.clear()
+    _recently_joined_tiles.clear()
+    _last_clicked_tile = None
+
+
+def _sleep(seconds: float, stop_event: threading.Event, jitter: bool = True) -> bool:
+    """Nghỉ có thể ngắt ngay lập tức khi stop_event được set, kèm độ lệch ngẫu nhiên nhẹ chống game quét."""
+    import random
+    extra = random.uniform(0.01, 0.035) if jitter else 0.0
+    deadline = time.time() + seconds + extra
     while time.time() < deadline:
         if stop_event.is_set():
             return True
@@ -150,13 +160,19 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         green_btns.sort(key=lambda b: b[1])
 
         joined_any = False
+        cooldown_time = getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
         if green_btns:
-            btn_x, btn_y = green_btns[0]
-            _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, "Tham gia Rally (Danh sách)", log_cb)
-            joined_any = True
+            # Lần lượt tham gia tất cả các Rally còn slot xanh trong danh sách (xử lý chồng Rally)
+            for idx, (btn_x, btn_y) in enumerate(green_btns):
+                if stop_event.is_set():
+                    break
+                _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally {idx+1}/{len(green_btns)}", log_cb)
+                joined_any = True
+                _sleep(0.35, stop_event)
+
             if _last_clicked_tile is not None:
-                _recently_joined_tiles[_last_clicked_tile] = time.time() + 240.0
-            if _sleep(0.4, stop_event):
+                _recently_joined_tiles[_last_clicked_tile] = time.time() + cooldown_time
+            if _sleep(0.3, stop_event):
                 return True, True
         else:
             if _last_clicked_tile is not None:
@@ -199,7 +215,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             join_btn_y = int(gw_t + gw_h * 0.93)
             _adb_tap(adb, vp, join_btn_x, join_btn_y, "Tham gia Rally lẻ", log_cb)
             if _last_clicked_tile is not None:
-                _recently_joined_tiles[_last_clicked_tile] = time.time() + 240.0
+                _recently_joined_tiles[_last_clicked_tile] = time.time() + getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
             _sleep(0.4, stop_event)
             _adb_tap(adb, vp, back_x, back_y, "Bấm Back về Map", log_cb)
             _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
@@ -305,7 +321,7 @@ def scan_and_join_map_rallies(
             if joined_px >= config.RALLY_JOINED_PX_THRESHOLD:
                 if log_cb:
                     log_cb(f"Ô ({click_x}, {click_y}) đã có huy hiệu 'Đã tham gia' ({joined_px}px) -> Bỏ qua")
-                _recently_joined_tiles[tile] = time.time() + 240.0
+                _recently_joined_tiles[tile] = time.time() + getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
                 continue
 
         _last_clicked_tile = tile
@@ -388,6 +404,7 @@ def run_rally_loop(
 ):
     """Vòng lặp chạy chính của Auto Rally."""
     log_cb("Khởi động Auto Rally (Tổng Tấn Công)...")
+    reset_rally_state()
     sct = mss.mss()
 
     is_first_cycle = True

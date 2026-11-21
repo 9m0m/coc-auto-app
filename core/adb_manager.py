@@ -257,13 +257,24 @@ class ADBManager:
                 return self.screen_size
         return None
 
-    def tap(self, x: int, y: int) -> bool:
-        """Thực hiện click ngầm (tap) vào tọa độ (x, y) trên màn hình Android."""
+    def tap(self, x: int, y: int, jitter: bool = True) -> bool:
+        """
+        Thực hiện click ngầm (tap) vào tọa độ (x, y) trên màn hình Android.
+        Mặc định tạo độ lệch ngẫu nhiên nhẹ (±2 pixel) mô phỏng ngón tay người bấm thực tế,
+        loại bỏ hoàn toàn nguy cơ bị server game phát hiện việc lặp lại tọa độ chuẩn xác tuyệt đối.
+        """
         if not self.active_serial:
             return False
 
+        tap_x = int(x)
+        tap_y = int(y)
+        if jitter:
+            import random
+            tap_x += random.randint(-2, 2)
+            tap_y += random.randint(-2, 2)
+
         code, _ = self.run_cmd(
-            ["-s", self.active_serial, "shell", "input", "tap", str(int(x)), str(int(y))]
+            ["-s", self.active_serial, "shell", "input", "tap", str(tap_x), str(tap_y)]
         )
         return code == 0
 
