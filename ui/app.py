@@ -212,7 +212,7 @@ class AutoApp(ctk.CTk):
         self._build_terminal_log()
 
         # Phím tắt toàn cục F8 (Bật / Tắt thông minh)
-        self.bind("<F8>", lambda e: self.toggle_auto())
+        self._last_toggle_time: float = 0.0
         self._setup_global_hotkey()
 
         # Đăng ký đóng ứng dụng an toàn
@@ -260,15 +260,20 @@ class AutoApp(ctk.CTk):
         self._help_dlg = HelpDialog(self)
 
     def _setup_global_hotkey(self):
-        """Đăng ký phím tắt toàn cục F8 qua thư viện keyboard."""
+        """Đăng ký phím tắt toàn cục F8 qua thư viện keyboard. Fallback Tkinter bind nếu lỗi."""
         try:
             import keyboard
             keyboard.add_hotkey("F8", lambda: self.after(0, self.toggle_auto))
         except Exception:
-            pass
+            self.bind("<F8>", lambda e: self.toggle_auto())
 
     def toggle_auto(self):
-        """Bật / Tắt trạng thái Auto nhanh bằng 1 phím thông minh F8."""
+        """Bật / Tắt trạng thái Auto nhanh bằng 1 phím thông minh F8 (có chống dội phím 0.5s)."""
+        now = time.time()
+        if now - getattr(self, "_last_toggle_time", 0.0) < 0.5:
+            return
+        self._last_toggle_time = now
+
         if self.is_running:
             self.stop_auto()
         else:
