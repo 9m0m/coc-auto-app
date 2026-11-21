@@ -82,7 +82,7 @@ class HelpDialog(ctk.CTkToplevel):
         ).pack(anchor="w", padx=14, pady=(8, 3))
         txt1 = (
             "• BlueStacks 5: Cài đặt -> Nâng cao -> Bật Cầu gỡ lỗi Android (ADB)\n"
-            "• LDPlayer / MuMu / Nox / MEmu: Bật kết nối/gỡ lỗi ADB trong Cài đặt\n"
+            "• LDPlayer / MuMu / Nox: Bật kết nối ADB (nếu đã bật sẵn thì giữ nguyên)\n"
             "• Độ phân giải khuyến nghị: 1600 x 900 hoặc 1280 x 720 (16:9)"
         )
         ctk.CTkLabel(

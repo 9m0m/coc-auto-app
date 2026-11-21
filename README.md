@@ -15,20 +15,65 @@ Tải file `COC_AutoMaster.exe` về máy và mở trực tiếp. Ứng dụng �
 
 ---
 
-## Hướng Dẫn Kích Hoạt ADB Trên Từng Giả Lập
+## Tính Năng ADB Là Gì & Bật Lên Có Bị Gì Không?
 
-Ứng dụng tự động dò tìm và kết nối tới cổng ADB nội bộ của các giả lập. Bạn chỉ cần đảm bảo tùy chọn ADB đã được bật trên giả lập:
+### 1. Bật ADB để làm gì?
+ADB (Android Debug Bridge) là giao thức cầu nối chính thức do Google phát triển riêng cho hệ điều hành Android.
+Khi bật tính năng này, ứng dụng Auto có thể gửi tín hiệu chạm/vuốt cảm ứng trực tiếp vào nhân máy ảo Android.
+- **Lợi ích quan trọng nhất:** Hoàn toàn **không chiếm chuột máy tính**. Con trỏ chuột của bạn được tự do 100% để bạn thoải mái làm việc, gõ văn bản, lướt web, xem video hoặc chơi tựa game khác trong lúc bot đang chạy ngầm bên dưới.
 
-- **BlueStacks 5:**
-  Vào Cài đặt (biểu tượng bánh răng) -> chọn thẻ Nâng cao -> gạt BẬT tùy chọn "Cầu gỡ lỗi Android" (Android Debug Bridge - ADB). Cổng mặc định thường là 5555, 5665, 5705...
-- **LDPlayer 9 / 4:**
-  Vào Cài đặt (biểu tượng bánh răng) -> chọn thẻ Nâng cao (hoặc Khác) -> tại mục "Gỡ lỗi ADB", chọn "Mở kết nối cục bộ" (Local Connection). Cổng mặc định thường là 5555, 5557, 5559...
-- **MuMu Player 12 / 6:**
-  Vào Trung tâm cài đặt -> chọn thẻ Khác -> tích chọn BẬT "Gỡ lỗi ADB". Cổng mặc định thường là 7555 hoặc 16384.
-- **NoxPlayer:**
-  Vào Cài đặt hệ thống -> Cài đặt điện thoại / Chung -> tích chọn BẬT "Gỡ lỗi USB / ADB". Cổng mặc định thường là 62001.
-- **MEmu Play:**
-  Vào Cài đặt -> Nâng cao -> BẬT kết nối ADB. Cổng mặc định thường là 21503.
+### 2. Bật ADB có bị ảnh hưởng gì không?
+- **Về bảo mật:** Hoàn toàn an toàn. Kết nối ADB chỉ mở trong mạng nội bộ máy tính cá nhân của bạn (`127.0.0.1` - Localhost), tuyệt đối không mở ra mạng Internet bên ngoài nên không có nguy cơ bị xâm nhập.
+- **Về hiệu năng:** Dịch vụ ADB chạy ngầm tiêu tốn gần như 0% CPU và chỉ vài Megabyte RAM, không gây giật lag hay giảm FPS của máy.
+- **Về tài khoản game:** ADB chỉ truyền thao tác chạm màn hình mô phỏng người dùng thực tế, hoàn toàn **không can thiệp chỉnh sửa file game hay can thiệp bộ nhớ RAM**, an toàn tuyệt đối.
+
+---
+
+## Hướng Dẫn Kích Hoạt ADB Chi Tiết Từng Giả Lập
+
+Ứng dụng tự động dò tìm cổng kết nối. Bạn chỉ cần kiểm tra xem giả lập của mình đã bật ADB chưa theo các bước bên dưới.
+
+> Lưu ý chung: Nếu khi mở bảng Cài đặt mà thấy tùy chọn ADB đã ở trạng thái BẬT sẵn (hoặc đang chọn Mở kết nối cục bộ), bạn **giữ nguyên và đóng bảng cài đặt lại**, không cần chỉnh sửa hay khởi động lại giả lập.
+
+### 1. BlueStacks 5
+1. Mở BlueStacks 5, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở thanh công cụ bên phải (hoặc nhấn tổ hợp phím `Ctrl + Shift + I`).
+2. Ở danh mục bên trái, chọn thẻ **Nâng cao** (Advanced).
+3. Tìm mục **Cầu gỡ lỗi Android** (Android Debug Bridge - ADB):
+   - Nếu công tắc đang màu xám (TẮT): Gạt công tắc sang **BẬT** (chuyển sang màu xanh).
+   - Nếu công tắc đã màu xanh (BẬT sẵn): Giữ nguyên.
+4. Nhấp nút **Lưu thay đổi** (Save changes) ở góc dưới cùng bên phải.
+
+### 2. LDPlayer (LDPlayer 9 & 4)
+1. Mở LDPlayer, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở góc trên thanh công cụ bên phải.
+2. Nhấp chọn thẻ **Khác** (Other Settings) hoặc thẻ **Nâng cao** (Advanced).
+3. Tìm dòng **Gỡ lỗi ADB** (ADB debugging):
+   - Nếu đang hiển thị "Đóng" (Close): Nhấp chọn chuyển sang **"Mở kết nối cục bộ"** (Open local connection).
+   - Nếu đã hiển thị sẵn "Mở kết nối cục bộ": Giữ nguyên.
+4. Nhấp nút **Lưu cài đặt** (Save) và chọn **Khởi động lại ngay** (Restart now) để giả lập áp dụng cấu hình.
+
+### 3. MuMu Player (MuMu 12 & 6)
+1. Mở MuMu Player, nhấp vào biểu tượng **Menu 3 dấu gạch ngang** (hoặc Bánh răng) ở góc trên bên phải -> chọn **Trung tâm cài đặt** (Settings Center).
+2. Nhấp chọn thẻ **Khác** (Other Settings) hoặc **Cơ bản** (Basic Settings).
+3. Tìm mục **Gỡ lỗi ADB** (ADB Debugging):
+   - Nếu chưa tích: Nhấp tích chọn **BẬT** (Turn on ADB).
+   - Nếu đã có dấu tích xanh: Giữ nguyên.
+4. Nhấp nút **Lưu thay đổi** (Save changes) và khởi động lại MuMu Player.
+
+### 4. NoxPlayer
+1. Mở NoxPlayer, nhấp vào biểu tượng **Bánh răng (Cài đặt hệ thống)** ở thanh tiêu đề góc trên bên phải.
+2. Chọn thẻ **Cài đặt chung** (General Settings) hoặc **Cài đặt điện thoại** (Phone settings).
+3. Tìm mục **Bật gỡ lỗi USB / ADB** (USB debugging / ADB debugging):
+   - Nếu chưa tích: Nhấp tích chọn BẬT.
+   - Nếu đã tích sẵn: Giữ nguyên.
+4. Nhấp nút **Lưu cài đặt** (Save changes) và khởi động lại NoxPlayer.
+
+### 5. MEmu Play
+1. Mở MEmu Play, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở thanh công cụ bên phải.
+2. Nhấp chọn thẻ **Nâng cao** (Advanced).
+3. Tìm dòng **Kết nối ADB** (ADB Connection):
+   - Nếu đang tắt: Chuyển sang **BẬT** (Open).
+   - Nếu đã bật sẵn: Giữ nguyên.
+4. Nhấp nút **Lưu** (Save) và khởi động lại MEmu Play.
 
 ---
 
