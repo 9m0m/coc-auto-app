@@ -225,7 +225,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _adb_tap(adb, vp, back_x, back_y, "Đóng bảng tấn công đất", log_cb)
             _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
             _last_clicked_tile = None
-            return False, False
+            return True, False
 
         if green_px > 1500:
             join_btn_x = int(gw_l + gw_w * 0.72)
@@ -255,7 +255,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
         _last_clicked_tile = None
-        return False, False
+        return True, False
 
     return False, False
 
