@@ -255,25 +255,18 @@ class AutoApp(ctk.CTk):
         )
         self.btn_mode_adventure.pack(side="left", fill="x", expand=True, padx=2)
 
-        # Chỉ báo trạng thái chế độ đang chọn (Màu xanh Cyan dịu mắt #38bdf8)
-        desc_box = ctk.CTkFrame(
-            card_mode,
-            fg_color="#0c1728",
-            corner_radius=8,
-            border_width=1,
-            border_color="#1a3152",
-        )
-        desc_box.pack(fill="x", padx=14, pady=(0, 14))
-
+        # Huy hiệu viên thuốc hiển thị chế độ đang chọn (vừa khít nội dung, loại bỏ hoàn toàn khung lồng)
         self.lbl_mode_status = ctk.CTkLabel(
-            desc_box,
+            card_mode,
             text="● Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            fg_color="#0c1728",
             text_color="#38bdf8",
-            padx=12,
-            pady=7,
+            corner_radius=8,
+            padx=16,
+            pady=6,
         )
-        self.lbl_mode_status.pack()
+        self.lbl_mode_status.pack(pady=(0, 14))
 
     def _select_mode(self, mode: str):
         """Xử lý đổi chế độ với màu xanh hiện đại, êm dịu cho mắt."""
