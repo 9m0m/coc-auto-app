@@ -120,7 +120,7 @@ class HelpDialog(ctk.CTkToplevel):
             text_color="#38bdf8",
         ).pack(anchor="w", padx=14, pady=(10, 4))
         txt3 = (
-            "• Phím F1: Bắt đầu chạy Auto  |  Phím F2: Tạm dừng an toàn\n"
+            "• Phím F8: Bật / Tắt Auto nhanh (Phím tắt toàn cục)\n"
             "• Hỗ trợ, góp ý & giải đáp thắc mắc: Discord: 9m0m"
         )
         ctk.CTkLabel(
@@ -180,9 +180,9 @@ class AutoApp(ctk.CTk):
         self._build_action_controls()
         self._build_terminal_log()
 
-        # Phím tắt F1 (Bắt đầu) / F2 (Tạm dừng)
-        self.bind("<F1>", lambda e: self.start_auto())
-        self.bind("<F2>", lambda e: self.stop_auto())
+        # Phím tắt toàn cục F8 (Bật / Tắt thông minh)
+        self.bind("<F8>", lambda e: self.toggle_auto())
+        self._setup_global_hotkey()
 
         # Đăng ký đóng ứng dụng an toàn
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -224,6 +224,21 @@ class AutoApp(ctk.CTk):
     def open_help_dialog(self):
         """Mở cửa sổ Hướng dẫn sử dụng."""
         HelpDialog(self)
+
+    def _setup_global_hotkey(self):
+        """Đăng ký phím tắt toàn cục F8 qua thư viện keyboard."""
+        try:
+            import keyboard
+            keyboard.add_hotkey("F8", lambda: self.after(0, self.toggle_auto))
+        except Exception:
+            pass
+
+    def toggle_auto(self):
+        """Bật / Tắt trạng thái Auto nhanh bằng 1 phím thông minh F8."""
+        if self.is_running:
+            self.stop_auto()
+        else:
+            self.start_auto()
 
     def _build_device_card(self):
         """Card thông tin giả lập với nền Slate dịu mắt và viền rõ ràng."""
@@ -431,7 +446,7 @@ class AutoApp(ctk.CTk):
         # Xanh ngọc lục bảo Emerald (#10b981)
         self.btn_start = ctk.CTkButton(
             btn_box,
-            text="▶ BẮT ĐẦU (F1)",
+            text="▶ BẮT ĐẦU (F8)",
             height=44,
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             fg_color="#10b981",
@@ -447,7 +462,7 @@ class AutoApp(ctk.CTk):
         # Đỏ Crimson (#ef4444)
         self.btn_stop = ctk.CTkButton(
             btn_box,
-            text="⏸ TẠM DỪNG (F2)",
+            text="⏸ TẠM DỪNG (F8)",
             height=44,
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             fg_color="#ef4444",
@@ -632,7 +647,7 @@ class AutoApp(ctk.CTk):
     def _on_worker_finished(self):
         """Khôi phục trạng thái nút bấm khi auto dừng."""
         self.is_running = False
-        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#10b981", state="normal")
+        self.btn_start.configure(text="▶ BẮT ĐẦU (F8)", fg_color="#10b981", state="normal")
         self.btn_stop.configure(state="disabled")
         self.btn_mode_rally.configure(state="normal")
         self.btn_mode_fishing.configure(state="normal")
@@ -640,8 +655,13 @@ class AutoApp(ctk.CTk):
         self.log("⏹ Đã dừng hoạt động.")
 
     def on_closing(self):
-        """Đóng ứng dụng và giải phóng sạch daemon adb."""
+        """Đóng ứng dụng và giải phóng sạch daemon adb cùng hook bàn phím."""
         self.stop_event.set()
+        try:
+            import keyboard
+            keyboard.remove_all_hotkeys()
+        except Exception:
+            pass
         try:
             self.adb.run_cmd(["kill-server"], timeout=1.0)
         except Exception:
