@@ -222,9 +222,15 @@ def screen_to_android(
 ) -> Tuple[int, int]:
     """
     Chuyển đổi tọa độ pixel trên màn hình Windows sang tọa độ màn hình Android nội bộ.
+    Tự động chuẩn hóa hướng xoay (Portrait vs Landscape) giữa Viewport và Android.
     """
     g_left, g_top, g_w, g_h = game_vp
     a_w, a_h = android_size
+
+    # Tự động đồng bộ hướng xoay nếu game_vp là dọc (g_w < g_h)
+    # nhưng android_size lại là ngang (a_w > a_h) hoặc ngược lại
+    if (g_w < g_h and a_w > a_h) or (g_w > g_h and a_w < a_h):
+        a_w, a_h = a_h, a_w
 
     rel_x = (win_x - g_left) / float(g_w)
     rel_y = (win_y - g_top) / float(g_h)

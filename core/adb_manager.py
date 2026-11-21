@@ -216,13 +216,41 @@ class ADBManager:
         return None
 
     def refresh_screen_size(self) -> Optional[Tuple[int, int]]:
-        """Lấy độ phân giải nội bộ của màn hình Android (Width, Height)."""
+        """
+        Lấy độ phân giải nội bộ hiện tại của màn hình Android (Width, Height).
+        Đặc biệt hỗ trợ tự động nhận diện góc xoay màn hình (Portrait / Landscape)
+        khi game chạy dọc trên giả lập được cấu hình ngang (như BlueStacks).
+        """
         if not self.active_serial:
             return None
 
+        # 1. Ưu tiên lấy kích thước hiển thị hiện tại (đã tính góc xoay: cur=... hoặc app=...)
+        code, out = self.run_cmd(["-s", self.active_serial, "shell", "dumpsys", "window", "displays"])
+        if code == 0:
+            m = re.search(r"cur=(\d+)x(\d+)", out) or re.search(r"app=(\d+)x(\d+)", out)
+            if m:
+                w, h = int(m.group(1)), int(m.group(2))
+                self.screen_size = (w, h)
+                return self.screen_size
+
+        # 2. Thử qua dumpsys display
+        code, out = self.run_cmd(["-s", self.active_serial, "shell", "dumpsys", "display"])
+        if code == 0:
+            m = re.search(r"mCurrentDisplayRect=\w+\[\d+,\d+\]\[(\d+),(\d+)\]", out)
+            if m:
+                w, h = int(m.group(1)), int(m.group(2))
+                self.screen_size = (w, h)
+                return self.screen_size
+
+        # 3. Fallback sang wm size
         code, out = self.run_cmd(["-s", self.active_serial, "shell", "wm", "size"])
         if code == 0:
-            m = re.search(r"(\d+)x(\d+)", out)
+            override_m = re.search(r"Override size:\s*(\d+)x(\d+)", out)
+            if override_m:
+                w, h = int(override_m.group(1)), int(override_m.group(2))
+                self.screen_size = (w, h)
+                return self.screen_size
+            m = re.search(r"Physical size:\s*(\d+)x(\d+)", out) or re.search(r"(\d+)x(\d+)", out)
             if m:
                 w, h = int(m.group(1)), int(m.group(2))
                 self.screen_size = (w, h)

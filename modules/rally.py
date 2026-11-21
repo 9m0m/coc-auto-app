@@ -344,16 +344,17 @@ def ensure_map_overview(
     click_y = int(gw_t + gw_h * getattr(config, "RALLY_ZOOM_BTN_REL_Y", 0.770))
 
     zoom_tpl = assets.get_zoom_btn_template()
+    has_zoom_minus = False
     if zoom_tpl is not None:
         roi_y1 = int(gw_t + gw_h * 0.68)
         roi_y2 = int(gw_t + gw_h * 0.85)
         roi_x1 = int(gw_l + gw_w * 0.01)
-        roi_x2 = int(gw_l + gw_w * 0.22)
+        roi_x2 = int(gw_l + gw_w * 0.25)
         roi_crop = safe_grab(sct, {"left": roi_x1, "top": roi_y1, "width": roi_x2 - roi_x1, "height": roi_y2 - roi_y1})
         if roi_crop is not None:
             best_val = 0.0
             best_pt = None
-            for sc in [0.8, 0.9, 1.0, 1.1, 1.2]:
+            for sc in [0.75, 0.85, 0.95, 1.0, 1.1, 1.25]:
                 cur_w = int(zoom_tpl.shape[1] * sc)
                 cur_h = int(zoom_tpl.shape[0] * sc)
                 if cur_w >= roi_crop.shape[1] or cur_h >= roi_crop.shape[0]:
@@ -365,14 +366,18 @@ def ensure_map_overview(
                     best_val = max_v
                     best_pt = (roi_x1 + max_l[0] + cur_w // 2, roi_y1 + max_l[1] + cur_h // 2)
 
-            if best_val >= 0.60 and best_pt is not None:
+            if best_val >= 0.55 and best_pt is not None:
                 click_x, click_y = best_pt
+                has_zoom_minus = True
 
-    if log_cb:
-        log_cb("Tự động kích hoạt toàn cảnh bản đồ (Kính lúp dấu trừ)...")
-    _adb_tap(adb, vp, click_x, click_y, "Kính lúp toàn cảnh", log_cb)
-    _sleep(0.4, stop_event)
-    return True
+    if has_zoom_minus:
+        if log_cb:
+            log_cb("Tự động kích hoạt toàn cảnh bản đồ (Kính lúp dấu trừ)...")
+        _adb_tap(adb, vp, click_x, click_y, "Kính lúp toàn cảnh", log_cb)
+        _sleep(0.5, stop_event)
+        return True
+
+    return False
 
 
 def run_rally_loop(

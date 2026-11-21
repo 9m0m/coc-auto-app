@@ -585,11 +585,17 @@ class AutoApp(ctk.CTk):
 
         serial = self.adb.auto_connect()
         if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
-            sz = self.adb.screen_size
+            sw, sh = self.adb.screen_size
+            vw, vh = self.game_vp[2], self.game_vp[3]
+            # Tự động đồng bộ hướng xoay (Portrait / Landscape) giữa Viewport và Android
+            if (vw < vh and sw > sh) or (vw > vh and sw < sh):
+                sw, sh = sh, sw
+                self.adb.screen_size = (sw, sh)
+
             self.lbl_status_dot.configure(text_color="#10b981")
             self.lbl_emulator_name.configure(text=f"{title}")
             self.lbl_details.configure(
-                text=f"Cổng: {serial} • Android: {sz[0]}x{sz[1]} • Viewport: {self.game_vp[2]}x{self.game_vp[3]}"
+                text=f"Cổng: {serial} • Android: {sw}x{sh} • Viewport: {vw}x{vh}"
             )
             self.log(f"Đã kết nối thành công: {title} ({serial})")
         elif serial:
