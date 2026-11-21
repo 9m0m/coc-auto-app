@@ -148,9 +148,9 @@ RALLY_GREY_VAL_MAX: int = 210
 RALLY_GREY_PX_THRESHOLD: int = 2500
 
 # Dòng chữ xanh lá "Đã tham gia" trên avatar ở Map
-HSV_RALLY_JOINED_GREEN_LOWER = [35, 90, 90]
+HSV_RALLY_JOINED_GREEN_LOWER = [35, 110, 110]
 HSV_RALLY_JOINED_GREEN_UPPER = [85, 255, 255]
-RALLY_JOINED_PX_THRESHOLD: int = 150
+RALLY_JOINED_PX_THRESHOLD: int = 300
 
 # Ngưỡng nhận diện Template Matching tiêu đề 'Tổng Tấn Công!' trên Mapview
 # (Giá trị thật: 0.78 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.43. Ngưỡng 0.62 bắt nhạy đa mùa 100% không bắt nhầm)
