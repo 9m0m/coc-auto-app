@@ -1,7 +1,7 @@
 """
-Giao diện người dùng COC AutoMaster - Phong cách Tatari Companion (Clash of Critters).
-Gam màu ấm áp, tương phản rõ ràng, bố cục trực quan, tối giản, cực kỳ dễ nhìn và thân thiện.
-Lấy cảm hứng trực tiếp từ phong cách đồ họa của: https://kenzkunz.github.io/tatari-companion/
+Giao diện người dùng COC AutoMaster - Chuẩn Modern Slate & Cyber Blue.
+Gam màu công thái học chuyên nghiệp, tương phản sắc nét, loại bỏ màu vàng chói,
+dễ nhìn, không mỏi mắt khi sử dụng lâu dài theo tiêu chuẩn UI/UX quốc tế.
 """
 
 import sys
@@ -37,15 +37,15 @@ class AutoApp(ctk.CTk):
         self.geometry("520x650")
         self.resizable(False, False)
         
-        # Gam màu chủ đạo Tatari: Nền tối ấm Espresso (#1c1917)
-        self.configure(fg_color="#1c1917")
+        # Gam màu nền Slate trung tính dịu mắt (#0c1017)
+        self.configure(fg_color="#0c1017")
 
-        # Đồng bộ màu thanh tiêu đề Windows 11 với giao diện
+        # Đồng bộ màu thanh tiêu đề Windows 11 với cửa sổ ứng dụng
         if pywinstyles is not None:
             try:
                 self.update()
-                pywinstyles.change_header_color(self, color="#1c1917")
-                pywinstyles.change_border_color(self, color="#3d3733")
+                pywinstyles.change_header_color(self, color="#0c1017")
+                pywinstyles.change_border_color(self, color="#243044")
             except Exception:
                 pass
 
@@ -59,7 +59,7 @@ class AutoApp(ctk.CTk):
         self.is_running = False
         self.selected_mode = "rally"
 
-        # Khởi tạo các thành phần giao diện phong cách Tatari Companion
+        # Khởi tạo các thành phần giao diện chuẩn Slate & Blue
         self._build_header()
         self._build_device_card()
         self._build_mode_selector()
@@ -77,29 +77,29 @@ class AutoApp(ctk.CTk):
         self.after(300, self.refresh_connection)
 
     def _build_header(self):
-        """Header gọn gàng với tông vàng hoàng kim Tatari (#ffcd38)."""
+        """Header tối giản, tinh tế với điểm nhấn Cyber Blue (#38bdf8)."""
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=24, pady=(20, 10))
 
         title_box = ctk.CTkFrame(header, fg_color="transparent")
         title_box.pack(side="left")
 
-        # Tiêu đề ứng dụng nổi bật màu kem sáng ấm
+        # Tiêu đề ứng dụng sắc nét màu trắng tuyết
         title = ctk.CTkLabel(
             title_box,
             text="COC AutoMaster",
             font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
-            text_color="#fffdf5",
+            text_color="#f8fafc",
         )
         title.pack(side="left")
 
-        # Huy hiệu Companion tông vàng hổ phách
+        # Huy hiệu viên thuốc HYBRID màu xanh công nghệ cao
         badge = ctk.CTkLabel(
             title_box,
-            text="COMPANION",
+            text="HYBRID",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color="#362912",
-            text_color="#ffcd38",
+            fg_color="#0e2238",
+            text_color="#38bdf8",
             corner_radius=8,
             padx=10,
             pady=3,
@@ -107,13 +107,13 @@ class AutoApp(ctk.CTk):
         badge.pack(side="left", padx=10)
 
     def _build_device_card(self):
-        """Card thông tin giả lập với nền ấm dễ nhìn và tương phản tốt."""
+        """Card thông tin giả lập với nền Slate dịu mắt và viền rõ ràng."""
         self.card_device = ctk.CTkFrame(
             self,
             corner_radius=14,
-            fg_color="#262220",
+            fg_color="#151c28",
             border_width=1,
-            border_color="#3d3733",
+            border_color="#243044",
         )
         self.card_device.pack(fill="x", padx=24, pady=6)
 
@@ -125,7 +125,7 @@ class AutoApp(ctk.CTk):
             status_row,
             text="●",
             font=ctk.CTkFont(size=14, weight="bold"),
-            text_color="#eab308",  # Vàng chờ
+            text_color="#f59e0b",  # Vàng cam chờ
         )
         self.lbl_status_dot.pack(side="left", padx=(0, 8))
 
@@ -133,7 +133,7 @@ class AutoApp(ctk.CTk):
             status_row,
             text="Đang tìm kiếm giả lập...",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color="#fffdf5",
+            text_color="#f8fafc",
         )
         self.lbl_emulator_name.pack(side="left")
 
@@ -142,7 +142,7 @@ class AutoApp(ctk.CTk):
             self.card_device,
             text="Cổng: Đang dò • Màn hình: Đang đọc",
             font=ctk.CTkFont(family="Segoe UI", size=12),
-            text_color="#9c9284",
+            text_color="#94a3b8",
             anchor="w",
         )
         self.lbl_details.pack(fill="x", padx=18, pady=(0, 12))
@@ -156,12 +156,12 @@ class AutoApp(ctk.CTk):
             text="Quét Giả Lập",
             height=36,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#332d29",
-            hover_color="#433b36",
+            fg_color="#1f2838",
+            hover_color="#2c3a50",
             border_width=1,
-            border_color="#4d443e",
+            border_color="#374763",
             corner_radius=9,
-            text_color="#fffdf5",
+            text_color="#f8fafc",
             command=self.refresh_connection,
         )
         self.btn_rescan.pack(side="left", fill="x", expand=True, padx=(0, 6))
@@ -182,13 +182,13 @@ class AutoApp(ctk.CTk):
         self.btn_test.pack(side="right", fill="x", expand=True, padx=(6, 0))
 
     def _build_mode_selector(self):
-        """Khung chọn chế độ phong cách Tatari với phím màu vàng gold rực rỡ khi chọn."""
+        """Khung chọn chế độ chuẩn màu Cobalt Blue dịu mắt, cực kỳ dễ nhận biết."""
         card_mode = ctk.CTkFrame(
             self,
             corner_radius=14,
-            fg_color="#262220",
+            fg_color="#151c28",
             border_width=1,
-            border_color="#3d3733",
+            border_color="#243044",
         )
         card_mode.pack(fill="x", padx=24, pady=6)
 
@@ -197,34 +197,34 @@ class AutoApp(ctk.CTk):
             card_mode,
             text="CHẾ ĐỘ TỰ ĐỘNG",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            text_color="#9c9284",
+            text_color="#64748b",
             anchor="w",
         )
         lbl_card_title.pack(fill="x", padx=18, pady=(12, 8))
 
-        # Khay chứa các nút chọn chế độ
+        # Khay chứa nút chọn chế độ (dạng Segmented Control chìm)
         capsule_box = ctk.CTkFrame(
             card_mode,
             corner_radius=10,
-            fg_color="#181514",
+            fg_color="#090d15",
             border_width=1,
-            border_color="#2e2925",
+            border_color="#1e2738",
         )
         capsule_box.pack(fill="x", padx=14, pady=(0, 10))
 
         btn_inner_row = ctk.CTkFrame(capsule_box, fg_color="transparent")
         btn_inner_row.pack(fill="x", padx=4, pady=4)
 
-        # Nút Auto Rally (Mặc định chọn: Nền vàng rực #ffcd38, chữ đen đậm cực dễ nhìn)
+        # Nút Auto Rally (Mặc định chọn: Nền xanh dương dịu mắt #0284c7, chữ trắng nổi bật)
         self.btn_mode_rally = ctk.CTkButton(
             btn_inner_row,
             text="Auto Rally",
             height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#ffcd38",
-            hover_color="#f59e0b",
+            fg_color="#0284c7",
+            hover_color="#0369a1",
             corner_radius=8,
-            text_color="#1c1917",
+            text_color="#ffffff",
             command=lambda: self._select_mode("rally"),
         )
         self.btn_mode_rally.pack(side="left", fill="x", expand=True, padx=2)
@@ -235,9 +235,9 @@ class AutoApp(ctk.CTk):
             height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             fg_color="transparent",
-            hover_color="#28231f",
+            hover_color="#182030",
             corner_radius=8,
-            text_color="#9c9284",
+            text_color="#94a3b8",
             command=lambda: self._select_mode("fishing"),
         )
         self.btn_mode_fishing.pack(side="left", fill="x", expand=True, padx=2)
@@ -248,20 +248,20 @@ class AutoApp(ctk.CTk):
             height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             fg_color="transparent",
-            hover_color="#28231f",
+            hover_color="#182030",
             corner_radius=8,
-            text_color="#9c9284",
+            text_color="#94a3b8",
             command=lambda: self._select_mode("adventure"),
         )
         self.btn_mode_adventure.pack(side="left", fill="x", expand=True, padx=2)
 
-        # Chỉ báo trạng thái chi tiết của chế độ đang chọn
+        # Chỉ báo trạng thái chế độ đang chọn (Màu xanh Cyan dịu mắt #38bdf8)
         desc_box = ctk.CTkFrame(
             card_mode,
-            fg_color="#2a2318",
+            fg_color="#0c1728",
             corner_radius=8,
             border_width=1,
-            border_color="#4a3a22",
+            border_color="#1a3152",
         )
         desc_box.pack(fill="x", padx=14, pady=(0, 14))
 
@@ -269,29 +269,29 @@ class AutoApp(ctk.CTk):
             desc_box,
             text="● Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color="#ffcd38",
+            text_color="#38bdf8",
             padx=12,
             pady=7,
         )
         self.lbl_mode_status.pack()
 
     def _select_mode(self, mode: str):
-        """Xử lý đổi chế độ với màu sắc tương phản rõ ràng."""
+        """Xử lý đổi chế độ với màu xanh hiện đại, êm dịu cho mắt."""
         if self.is_running:
             return
 
         self.selected_mode = mode
 
-        # Cấu hình nút Active (Vàng Gold nổi bật) và Inactive (Chìm nhẹ nhàng)
+        # Cấu hình nút Active (Xanh dương hiện đại) và Inactive (Xám bạc chìm)
         inactive_cfg = {
             "fg_color": "transparent",
-            "hover_color": "#28231f",
-            "text_color": "#9c9284",
+            "hover_color": "#182030",
+            "text_color": "#94a3b8",
         }
         active_cfg = {
-            "fg_color": "#ffcd38",
-            "hover_color": "#f59e0b",
-            "text_color": "#1c1917",
+            "fg_color": "#0284c7",
+            "hover_color": "#0369a1",
+            "text_color": "#ffffff",
         }
 
         self.btn_mode_rally.configure(**inactive_cfg)
@@ -318,27 +318,27 @@ class AutoApp(ctk.CTk):
             self.log("Chuyển chế độ: Auto Phiêu Lưu")
 
     def _build_action_controls(self):
-        """2 Nút Bắt đầu / Tạm dừng với màu sắc tươi sáng game: Xanh cỏ & Đỏ san hô."""
+        """2 Nút Bắt đầu / Tạm dừng chuẩn màu Semantic: Emerald Green & Crimson Red."""
         btn_box = ctk.CTkFrame(self, fg_color="transparent")
         btn_box.pack(fill="x", padx=24, pady=8)
 
-        # Xanh lá cây Tatari Green (#22c55e)
+        # Xanh ngọc lục bảo Emerald (#10b981)
         self.btn_start = ctk.CTkButton(
             btn_box,
             text="▶ BẮT ĐẦU (F1)",
             height=44,
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            fg_color="#22c55e",
-            hover_color="#16a34a",
+            fg_color="#10b981",
+            hover_color="#059669",
             border_width=1,
-            border_color="#4ade80",
+            border_color="#34d399",
             corner_radius=12,
             text_color="#ffffff",
             command=self.start_auto,
         )
         self.btn_start.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
-        # Đỏ san hô Coral Red (#ef4444)
+        # Đỏ Crimson (#ef4444)
         self.btn_stop = ctk.CTkButton(
             btn_box,
             text="⏸ TẠM DỪNG (F2)",
@@ -356,13 +356,13 @@ class AutoApp(ctk.CTk):
         self.btn_stop.pack(side="right", fill="x", expand=True, padx=(6, 0))
 
     def _build_terminal_log(self):
-        """Khung Console nhật ký phong cách Tatari dễ đọc, không mỏi mắt."""
+        """Khung Console nhật ký phong cách Slate sắc nét, chuyên nghiệp."""
         log_box = ctk.CTkFrame(
             self,
             corner_radius=14,
-            fg_color="#262220",
+            fg_color="#151c28",
             border_width=1,
-            border_color="#3d3733",
+            border_color="#243044",
         )
         log_box.pack(fill="both", expand=True, padx=24, pady=(4, 18))
 
@@ -374,7 +374,7 @@ class AutoApp(ctk.CTk):
             log_top,
             text="NHẬT KÝ HOẠT ĐỘNG",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            text_color="#9c9284",
+            text_color="#64748b",
         )
         lbl_log.pack(side="left")
 
@@ -384,12 +384,12 @@ class AutoApp(ctk.CTk):
             width=52,
             height=22,
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color="#332d29",
-            hover_color="#433b36",
+            fg_color="#1f2838",
+            hover_color="#2c3a50",
             border_width=1,
-            border_color="#4d443e",
+            border_color="#374763",
             corner_radius=6,
-            text_color="#9c9284",
+            text_color="#94a3b8",
             command=self.clear_log,
         )
         btn_clear.pack(side="right")
@@ -397,8 +397,8 @@ class AutoApp(ctk.CTk):
         self.txt_log = ctk.CTkTextbox(
             log_box,
             font=ctk.CTkFont(family="Consolas", size=11),
-            fg_color="#141211",
-            text_color="#f3e8c8",  # Màu kem ấm dễ đọc, không gắt mắt
+            fg_color="#080b11",
+            text_color="#38bdf8",  # Xanh Cyan dịu mắt, dễ theo dõi
             corner_radius=8,
             wrap="word",
         )
@@ -432,19 +432,19 @@ class AutoApp(ctk.CTk):
         serial = self.adb.auto_connect()
         if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
             sz = self.adb.screen_size
-            self.lbl_status_dot.configure(text_color="#22c55e")  # Xanh lá kết nối thành công
+            self.lbl_status_dot.configure(text_color="#10b981")  # Xanh ngọc lục bảo kết nối thành công
             self.lbl_emulator_name.configure(text=f"{title}")
             self.lbl_details.configure(
                 text=f"Cổng: {serial} • Android: {sz[0]}x{sz[1]} • Viewport: {self.game_vp[2]}x{self.game_vp[3]}"
             )
             self.log(f"Đã kết nối thành công: {title} ({serial})")
         elif serial:
-            self.lbl_status_dot.configure(text_color="#eab308")
+            self.lbl_status_dot.configure(text_color="#f59e0b")
             self.lbl_emulator_name.configure(text=f"{title} (Cần bật ADB)")
             self.lbl_details.configure(text="Hãy bật 'Cầu gỡ lỗi Android' trong Cài đặt BlueStacks.")
             self.log("Cửa sổ giả lập sẵn sàng nhưng ADB chưa mở. Hãy kiểm tra Cài đặt -> Nâng cao.")
         else:
-            self.lbl_status_dot.configure(text_color="#eab308")
+            self.lbl_status_dot.configure(text_color="#f59e0b")
             self.lbl_emulator_name.configure(text=f"{title} (Đang dò cổng)")
             self.lbl_details.configure(text="Đang thử các cổng ADB khác...")
 
@@ -489,7 +489,7 @@ class AutoApp(ctk.CTk):
         self.is_running = True
         self.stop_event.clear()
 
-        self.btn_start.configure(text="ĐANG CHẠY...", fg_color="#4b5563", state="disabled")
+        self.btn_start.configure(text="ĐANG CHẠY...", fg_color="#334155", state="disabled")
         self.btn_stop.configure(state="normal")
         self.btn_mode_rally.configure(state="disabled")
         self.btn_mode_fishing.configure(state="disabled")
@@ -526,7 +526,7 @@ class AutoApp(ctk.CTk):
     def _on_worker_finished(self):
         """Khôi phục trạng thái nút bấm khi auto dừng."""
         self.is_running = False
-        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#22c55e", state="normal")
+        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#10b981", state="normal")
         self.btn_stop.configure(state="disabled")
         self.btn_mode_rally.configure(state="normal")
         self.btn_mode_fishing.configure(state="normal")
