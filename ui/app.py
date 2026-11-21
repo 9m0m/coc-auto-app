@@ -1,6 +1,7 @@
 """
-Giao diện người dùng đồ họa Glass UI hiện đại cho COC AutoMaster.
-Thiết kế tối giản, loại bỏ chữ thừa, cân bằng kích thước nút bấm, thẩm mỹ cao.
+Giao diện người dùng đồ họa chuẩn phong cách iOS Glassmorphism (Liquid Glass) cho COC AutoMaster.
+Hiệu ứng kính mờ (Frosted Acrylic Glass), viền phản quang beveled rim, bo góc cong mượt (Squircle),
+viên thuốc điều hướng iOS Segmented Capsule, loại bỏ hoàn toàn lỗi font glyph.
 """
 
 import sys
@@ -11,13 +12,18 @@ from typing import Optional, Tuple
 
 import customtkinter as ctk
 
+try:
+    import pywinstyles
+except ImportError:
+    pywinstyles = None
+
 from core.viewport import setup_windows_environment, find_emulator_window, get_game_viewport, screen_to_android
 from core.adb_manager import ADBManager
 from modules.rally import run_rally_loop
 from modules.fishing import run_fishing_loop
 from modules.adventure import run_adventure_loop
 
-# Cấu hình giao diện chuẩn Dark Glass
+# Cấu hình giao diện chuẩn Dark Mode
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -28,9 +34,16 @@ class AutoApp(ctk.CTk):
 
         # Thiết lập cửa sổ chính
         self.title("COC AutoMaster")
-        self.geometry("520x640")
+        self.geometry("520x650")
         self.resizable(False, False)
-        self.configure(fg_color="#0a0e17")  # Nền tối sâu sang trọng
+        self.configure(fg_color="#0b101b")  # Nền tối sâu Acrylic
+
+        # Kích hoạt hiệu ứng kính mờ Windows 11 Acrylic Blur / Glass
+        if pywinstyles is not None:
+            try:
+                pywinstyles.apply_style(self, "acrylic")
+            except Exception:
+                pass
 
         # Quản lý hệ thống & tiến trình
         self.adb = ADBManager()
@@ -42,12 +55,12 @@ class AutoApp(ctk.CTk):
         self.is_running = False
         self.selected_mode = "rally"
 
-        # Khởi tạo các thành phần giao diện
+        # Khởi tạo các thành phần giao diện phong cách iOS Glass
         self._build_header()
-        self._build_device_card()
-        self._build_mode_card()
-        self._build_action_controls()
-        self._build_log_console()
+        self._build_device_glass_card()
+        self._build_mode_glass_capsule()
+        self._build_action_glass_controls()
+        self._build_terminal_glass_sheet()
 
         # Phím tắt F1 (Bắt đầu) / F2 (Tạm dừng)
         self.bind("<F1>", lambda e: self.start_auto())
@@ -60,9 +73,9 @@ class AutoApp(ctk.CTk):
         self.after(300, self.refresh_connection)
 
     def _build_header(self):
-        """Header tối giản, tinh tế, không chữ thừa."""
+        """Header phong cách Apple Dynamic Island / iOS Minimal."""
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=24, pady=(18, 10))
+        header.pack(fill="x", padx=24, pady=(20, 10))
 
         # Tiêu đề ứng dụng
         title_box = ctk.CTkFrame(header, fg_color="transparent")
@@ -76,49 +89,50 @@ class AutoApp(ctk.CTk):
         )
         title.pack(side="left")
 
+        # Huy hiệu viên thuốc (iOS Capsule Pill)
         badge = ctk.CTkLabel(
             title_box,
             text="HYBRID",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color="#1e293b",
+            fg_color="#182438",
             text_color="#38bdf8",
-            corner_radius=6,
-            padx=8,
-            pady=2,
+            corner_radius=8,
+            padx=9,
+            pady=3,
         )
         badge.pack(side="left", padx=10)
 
         # Nhãn trạng thái không chiếm chuột
         sub_tag = ctk.CTkLabel(
             header,
-            text="100% Không Chiếm Chuột",
+            text="Chạy Ngầm • Rảnh Chuột",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color="#64748b",
         )
         sub_tag.pack(side="right")
 
-    def _build_device_card(self):
-        """Card trạng thái giả lập phong cách Glass UI với nút bấm cân bằng."""
+    def _build_device_glass_card(self):
+        """Card trạng thái giả lập phong cách Frosted Glass với viền phản quang."""
         self.card_device = ctk.CTkFrame(
             self,
-            corner_radius=12,
-            fg_color="#111827",
+            corner_radius=16,
+            fg_color="#131b2e",
             border_width=1,
-            border_color="#1f293d",
+            border_color="#24344d",
         )
         self.card_device.pack(fill="x", padx=24, pady=6)
 
-        # Dòng 1: Đèn báo & Tên giả lập
+        # Dòng 1: Đèn báo Neon & Tên giả lập
         status_row = ctk.CTkFrame(self.card_device, fg_color="transparent")
-        status_row.pack(fill="x", padx=16, pady=(12, 4))
+        status_row.pack(fill="x", padx=18, pady=(14, 4))
 
         self.lbl_status_dot = ctk.CTkLabel(
             status_row,
             text="●",
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=14, weight="bold"),
             text_color="#f59e0b",
         )
-        self.lbl_status_dot.pack(side="left", padx=(0, 6))
+        self.lbl_status_dot.pack(side="left", padx=(0, 8))
 
         self.lbl_emulator_name = ctk.CTkLabel(
             status_row,
@@ -136,138 +150,158 @@ class AutoApp(ctk.CTk):
             text_color="#94a3b8",
             anchor="w",
         )
-        self.lbl_details.pack(fill="x", padx=16, pady=(0, 10))
+        self.lbl_details.pack(fill="x", padx=18, pady=(0, 12))
 
-        # Dòng 3: 2 Nút thao tác kích thước cân bằng 50/50
+        # Dòng 3: 2 Nút bấm kính mờ cân bằng 50/50
         action_row = ctk.CTkFrame(self.card_device, fg_color="transparent")
-        action_row.pack(fill="x", padx=16, pady=(0, 14))
+        action_row.pack(fill="x", padx=16, pady=(0, 16))
 
         self.btn_rescan = ctk.CTkButton(
             action_row,
-            text="🔄 Quét Lại",
-            height=34,
+            text="Quét Giả Lập",
+            height=36,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#1e293b",
-            hover_color="#334155",
+            fg_color="#1a2538",
+            hover_color="#26354d",
             border_width=1,
-            border_color="#334155",
-            corner_radius=8,
+            border_color="#334661",
+            corner_radius=10,
+            text_color="#e2e8f0",
             command=self.refresh_connection,
         )
         self.btn_rescan.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         self.btn_test = ctk.CTkButton(
             action_row,
-            text="🎯 Test Click",
-            height=34,
+            text="Thử Click Ngầm",
+            height=36,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#0284c7",
-            hover_color="#0369a1",
-            corner_radius=8,
+            fg_color="#0369a1",
+            hover_color="#0284c7",
+            border_width=1,
+            border_color="#38bdf8",
+            corner_radius=10,
+            text_color="#ffffff",
             command=self.test_single_click,
         )
         self.btn_test.pack(side="right", fill="x", expand=True, padx=(6, 0))
 
-    def _build_mode_card(self):
-        """Card chọn tính năng Auto trực quan, rõ ràng, không lỗi font."""
+    def _build_mode_glass_capsule(self):
+        """Thanh chọn chế độ chuẩn phong cách iOS Segmented Capsule Control."""
         card_mode = ctk.CTkFrame(
             self,
-            corner_radius=12,
-            fg_color="#111827",
+            corner_radius=16,
+            fg_color="#131b2e",
             border_width=1,
-            border_color="#1f293d",
+            border_color="#24344d",
         )
         card_mode.pack(fill="x", padx=24, pady=6)
 
         # Tiêu đề Card
         lbl_card_title = ctk.CTkLabel(
             card_mode,
-            text="CHỌN TÍNH NĂNG",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text="CHẾ ĐỘ TỰ ĐỘNG",
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             text_color="#64748b",
             anchor="w",
         )
-        lbl_card_title.pack(fill="x", padx=16, pady=(12, 8))
+        lbl_card_title.pack(fill="x", padx=18, pady=(12, 8))
 
-        # 3 Nút bấm riêng biệt cân bằng, không dùng segmented button để tránh lỗi font glyph
-        mode_btn_box = ctk.CTkFrame(card_mode, fg_color="transparent")
-        mode_btn_box.pack(fill="x", padx=14, pady=(0, 10))
+        # Vỏ bao viên thuốc nhúng chìm (iOS Inset Pill Container)
+        capsule_box = ctk.CTkFrame(
+            card_mode,
+            corner_radius=12,
+            fg_color="#090e1a",
+            border_width=1,
+            border_color="#1e293b",
+        )
+        capsule_box.pack(fill="x", padx=14, pady=(0, 10))
+
+        # 3 Nút chọn chế độ chuẩn font Apple, không dùng emoji gây lỗi glyph
+        btn_inner_row = ctk.CTkFrame(capsule_box, fg_color="transparent")
+        btn_inner_row.pack(fill="x", padx=4, pady=4)
 
         self.btn_mode_rally = ctk.CTkButton(
-            mode_btn_box,
-            text="⚔️ Rally",
-            height=38,
+            btn_inner_row,
+            text="Auto Rally",
+            height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             fg_color="#0284c7",
             hover_color="#0369a1",
             border_width=1,
             border_color="#38bdf8",
-            corner_radius=8,
+            corner_radius=9,
+            text_color="#ffffff",
             command=lambda: self._select_mode("rally"),
         )
-        self.btn_mode_rally.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        self.btn_mode_rally.pack(side="left", fill="x", expand=True, padx=2)
 
         self.btn_mode_fishing = ctk.CTkButton(
-            mode_btn_box,
-            text="🎣 Câu Cá",
-            height=38,
+            btn_inner_row,
+            text="Auto Câu Cá",
+            height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#1e293b",
-            hover_color="#334155",
-            border_width=1,
-            border_color="#334155",
-            corner_radius=8,
+            fg_color="transparent",
+            hover_color="#1e293b",
+            border_width=0,
+            corner_radius=9,
             text_color="#94a3b8",
             command=lambda: self._select_mode("fishing"),
         )
-        self.btn_mode_fishing.pack(side="left", fill="x", expand=True, padx=4)
+        self.btn_mode_fishing.pack(side="left", fill="x", expand=True, padx=2)
 
         self.btn_mode_adventure = ctk.CTkButton(
-            mode_btn_box,
-            text="🧭 Phiêu Lưu",
-            height=38,
+            btn_inner_row,
+            text="Auto Phiêu Lưu",
+            height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#1e293b",
-            hover_color="#334155",
-            border_width=1,
-            border_color="#334155",
-            corner_radius=8,
+            fg_color="transparent",
+            hover_color="#1e293b",
+            border_width=0,
+            corner_radius=9,
             text_color="#94a3b8",
             command=lambda: self._select_mode("adventure"),
         )
-        self.btn_mode_adventure.pack(side="left", fill="x", expand=True, padx=(4, 0))
+        self.btn_mode_adventure.pack(side="left", fill="x", expand=True, padx=2)
 
-        # Thanh chỉ báo trạng thái kích hoạt rõ ràng
-        desc_box = ctk.CTkFrame(card_mode, fg_color="#0d1424", corner_radius=6)
-        desc_box.pack(fill="x", padx=14, pady=(0, 12))
+        # Thanh chỉ báo trạng thái kích hoạt rõ ràng (Frosted Pill Chip)
+        desc_box = ctk.CTkFrame(
+            card_mode,
+            fg_color="#0d1526",
+            corner_radius=8,
+            border_width=1,
+            border_color="#1a2538",
+        )
+        desc_box.pack(fill="x", padx=14, pady=(0, 14))
 
         self.lbl_mode_status = ctk.CTkLabel(
             desc_box,
-            text="🎯 Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)",
+            text="● Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color="#38bdf8",
-            padx=10,
-            pady=6,
+            padx=12,
+            pady=7,
         )
         self.lbl_mode_status.pack()
 
     def _select_mode(self, mode: str):
-        """Xử lý chuyển đổi tính năng và cập nhật giao diện trực quan."""
+        """Xử lý chuyển đổi chế độ và cập nhật giao diện viên thuốc iOS."""
         if self.is_running:
             return
 
         self.selected_mode = mode
 
-        # Đặt lại màu cho cả 3 nút
+        # Cấu hình nút Active (Viên thuốc kính nổi bật) và Inactive (Trong suốt chìm)
         inactive_cfg = {
-            "fg_color": "#1e293b",
-            "hover_color": "#334155",
-            "border_color": "#334155",
+            "fg_color": "transparent",
+            "hover_color": "#1e293b",
+            "border_width": 0,
             "text_color": "#94a3b8",
         }
         active_cfg = {
             "fg_color": "#0284c7",
             "hover_color": "#0369a1",
+            "border_width": 1,
             "border_color": "#38bdf8",
             "text_color": "#ffffff",
         }
@@ -279,71 +313,79 @@ class AutoApp(ctk.CTk):
         if mode == "rally":
             self.btn_mode_rally.configure(**active_cfg)
             self.lbl_mode_status.configure(
-                text="🎯 Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)"
+                text="● Đang chọn: Auto Rally (Tổng Tấn Công Sa Hải Mê Thành)"
             )
-            self.log("Chuyển chế độ: ⚔️ Auto Rally")
+            self.log("Chuyển chế độ: Auto Rally")
         elif mode == "fishing":
             self.btn_mode_fishing.configure(**active_cfg)
             self.lbl_mode_status.configure(
-                text="🎯 Đang chọn: Auto Câu Cá (Tự Động Kéo Cá Theo Rãnh Vàng)"
+                text="● Đang chọn: Auto Câu Cá (Tự Động Kéo Cá Theo Rãnh Vàng)"
             )
-            self.log("Chuyển chế độ: 🎣 Auto Câu Cá")
+            self.log("Chuyển chế độ: Auto Câu Cá")
         elif mode == "adventure":
             self.btn_mode_adventure.configure(**active_cfg)
             self.lbl_mode_status.configure(
-                text="🎯 Đang chọn: Auto Phiêu Lưu (Tự Vượt Ải Mê Cung Cổ Vật)"
+                text="● Đang chọn: Auto Phiêu Lưu (Tự Vượt Ải Mê Cung Cổ Vật)"
             )
-            self.log("Chuyển chế độ: 🧭 Auto Phiêu Lưu")
+            self.log("Chuyển chế độ: Auto Phiêu Lưu")
 
-    def _build_action_controls(self):
-        """2 Nút Bắt đầu / Tạm dừng đồng đều 50/50, chuẩn đẹp."""
+    def _build_action_glass_controls(self):
+        """2 Nút Bắt đầu / Tạm dừng phong cách iOS Glass Buttons (50/50, bo góc lớn)."""
         btn_box = ctk.CTkFrame(self, fg_color="transparent")
         btn_box.pack(fill="x", padx=24, pady=8)
 
+        # iOS Vibrant Emerald Start
         self.btn_start = ctk.CTkButton(
             btn_box,
             text="▶ BẮT ĐẦU (F1)",
-            height=44,
+            height=46,
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
-            corner_radius=8,
+            fg_color="#059669",
+            hover_color="#10b981",
+            border_width=1,
+            border_color="#34d399",
+            corner_radius=12,
+            text_color="#ffffff",
             command=self.start_auto,
         )
         self.btn_start.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
+        # iOS Vibrant Crimson Stop
         self.btn_stop = ctk.CTkButton(
             btn_box,
             text="⏸ TẠM DỪNG (F2)",
-            height=44,
+            height=46,
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color="#ef4444",
-            hover_color="#dc2626",
-            corner_radius=8,
+            fg_color="#dc2626",
+            hover_color="#ef4444",
+            border_width=1,
+            border_color="#f87171",
+            corner_radius=12,
+            text_color="#ffffff",
             command=self.stop_auto,
             state="disabled",
         )
         self.btn_stop.pack(side="right", fill="x", expand=True, padx=(6, 0))
 
-    def _build_log_console(self):
-        """Khung Console nhật ký phong cách Glass Terminal."""
+    def _build_terminal_glass_sheet(self):
+        """Khung Console nhật ký phong cách Apple Terminal Sheet."""
         log_box = ctk.CTkFrame(
             self,
-            corner_radius=12,
+            corner_radius=16,
             fg_color="#070c18",
             border_width=1,
-            border_color="#1f293d",
+            border_color="#24344d",
         )
-        log_box.pack(fill="both", expand=True, padx=24, pady=(4, 16))
+        log_box.pack(fill="both", expand=True, padx=24, pady=(4, 18))
 
-        # Tiêu đề log + nút xoá
+        # Tiêu đề log + nút xoá kính mờ
         log_top = ctk.CTkFrame(log_box, fg_color="transparent")
-        log_top.pack(fill="x", padx=12, pady=(8, 4))
+        log_top.pack(fill="x", padx=16, pady=(10, 4))
 
         lbl_log = ctk.CTkLabel(
             log_top,
             text="NHẬT KÝ HOẠT ĐỘNG",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             text_color="#64748b",
         )
         lbl_log.pack(side="left")
@@ -351,11 +393,14 @@ class AutoApp(ctk.CTk):
         btn_clear = ctk.CTkButton(
             log_top,
             text="Xóa",
-            width=48,
-            height=20,
-            font=ctk.CTkFont(family="Segoe UI", size=10),
-            fg_color="transparent",
-            hover_color="#1e293b",
+            width=52,
+            height=22,
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            fg_color="#162032",
+            hover_color="#26354d",
+            border_width=1,
+            border_color="#2c3c52",
+            corner_radius=6,
             text_color="#94a3b8",
             command=self.clear_log,
         )
@@ -364,12 +409,12 @@ class AutoApp(ctk.CTk):
         self.txt_log = ctk.CTkTextbox(
             log_box,
             font=ctk.CTkFont(family="Consolas", size=11),
-            fg_color="#030712",
+            fg_color="#040711",
             text_color="#38bdf8",
-            corner_radius=8,
+            corner_radius=10,
             wrap="word",
         )
-        self.txt_log.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self.txt_log.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
     def log(self, msg: str):
         """Ghi log kèm mốc thời gian."""
@@ -399,7 +444,7 @@ class AutoApp(ctk.CTk):
         serial = self.adb.auto_connect()
         if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
             sz = self.adb.screen_size
-            self.lbl_status_dot.configure(text_color="#10b981")  # Xanh ngọc kết nối thành công
+            self.lbl_status_dot.configure(text_color="#10b981")  # Neon Green
             self.lbl_emulator_name.configure(text=f"{title}")
             self.lbl_details.configure(
                 text=f"Cổng: {serial} • Android: {sz[0]}x{sz[1]} • Viewport: {self.game_vp[2]}x{self.game_vp[3]}"
@@ -463,7 +508,7 @@ class AutoApp(ctk.CTk):
         self.btn_mode_adventure.configure(state="disabled")
 
         mode = self.selected_mode
-        mode_names = {"rally": "⚔️ Auto Rally", "fishing": "🎣 Auto Câu Cá", "adventure": "🧭 Auto Phiêu Lưu"}
+        mode_names = {"rally": "Auto Rally", "fishing": "Auto Câu Cá", "adventure": "Auto Phiêu Lưu"}
         self.log(f"🚀 BẮT ĐẦU CHẠY: {mode_names.get(mode, mode)}")
 
         def _runner():
@@ -493,7 +538,7 @@ class AutoApp(ctk.CTk):
     def _on_worker_finished(self):
         """Khôi phục trạng thái nút bấm khi auto dừng."""
         self.is_running = False
-        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#10b981", state="normal")
+        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#059669", state="normal")
         self.btn_stop.configure(state="disabled")
         self.btn_mode_rally.configure(state="normal")
         self.btn_mode_fishing.configure(state="normal")

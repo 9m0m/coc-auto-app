@@ -32,6 +32,7 @@ a = Analysis(
         'modules.fishing',
         'modules.adventure',
         'assets',
+        'pywinstyles',
     ],
     hookspath=[],
     hooksconfig={},
