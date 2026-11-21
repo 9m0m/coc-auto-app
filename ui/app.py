@@ -34,7 +34,7 @@ class HelpDialog(ctk.CTkToplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Hướng Dẫn Sử Dụng & Lưu Ý")
-        self.geometry("460x520")
+        self.geometry("480x570")
         self.resizable(False, False)
         self.configure(fg_color="#0c1017")
 
@@ -45,8 +45,8 @@ class HelpDialog(ctk.CTkToplevel):
         # Căn giữa so với cửa sổ cha
         self.update_idletasks()
         try:
-            x = parent.winfo_x() + (parent.winfo_width() - 460) // 2
-            y = parent.winfo_y() + (parent.winfo_height() - 520) // 2
+            x = parent.winfo_x() + (parent.winfo_width() - 480) // 2
+            y = parent.winfo_y() + (parent.winfo_height() - 570) // 2
             self.geometry(f"+{max(0, x)}+{max(0, y)}")
         except Exception:
             pass
@@ -69,69 +69,85 @@ class HelpDialog(ctk.CTkToplevel):
             font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
             text_color="#f8fafc",
         )
-        lbl_title.pack(pady=(16, 10))
+        lbl_title.pack(pady=(14, 8))
 
         # Khung 1: Thiết lập giả lập
         f1 = ctk.CTkFrame(self, fg_color="#151c28", border_width=1, border_color="#243044", corner_radius=10)
-        f1.pack(fill="x", padx=18, pady=5)
+        f1.pack(fill="x", padx=18, pady=4)
         ctk.CTkLabel(
             f1,
-            text="⚙ Cài Đặt Giả Lập (Bắt buộc)",
+            text="Cài Đặt Giả Lập & ADB",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color="#38bdf8",
-        ).pack(anchor="w", padx=14, pady=(10, 4))
+        ).pack(anchor="w", padx=14, pady=(8, 3))
         txt1 = (
-            "• BlueStacks 5: Vào Cài đặt ⚙ -> Nâng cao -> Bật Cầu gỡ lỗi Android (ADB)\n"
-            "• Độ phân giải khuyến nghị: 1600 x 900 (Landscape)\n"
-            "• 100% Không chiếm chuột: Tự động gửi thao tác chạm ngầm qua ADB,\n"
-            "  chuột máy tính hoàn toàn tự do để làm việc hoặc xem phim."
+            "• BlueStacks 5: Cài đặt -> Nâng cao -> Bật Cầu gỡ lỗi Android (ADB)\n"
+            "• LDPlayer / MuMu / Nox / MEmu: Bật kết nối/gỡ lỗi ADB trong Cài đặt\n"
+            "• Độ phân giải khuyến nghị: 1600 x 900 hoặc 1280 x 720 (16:9)"
         )
         ctk.CTkLabel(
             f1, text=txt1, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
-        ).pack(anchor="w", padx=14, pady=(0, 10))
+        ).pack(anchor="w", padx=14, pady=(0, 8))
 
-        # Khung 2: Hướng dẫn 3 tính năng
+        # Khung 2: Lưu ý cửa sổ & đa màn hình
         f2 = ctk.CTkFrame(self, fg_color="#151c28", border_width=1, border_color="#243044", corner_radius=10)
-        f2.pack(fill="x", padx=18, pady=5)
+        f2.pack(fill="x", padx=18, pady=4)
         ctk.CTkLabel(
             f2,
-            text="🎯 3 Chế Độ Hoạt Động",
+            text="Lưu Ý Quan Trọng (Tránh Lỗi Nhận Diện)",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color="#38bdf8",
-        ).pack(anchor="w", padx=14, pady=(10, 4))
+        ).pack(anchor="w", padx=14, pady=(8, 3))
         txt2 = (
-            "• Auto Rally: Mở sẵn Sa Hải Mê Thành. Tự canh 5p tổng tấn công\n"
-            "  và tự động thu phóng bản đồ overview (🔍-).\n"
-            "• Auto Câu Cá: Mở sẵn hồ câu cá. Tự động quăng cần, canh nhịp cá cắn\n"
-            "  và kéo thanh trượt theo rãnh vàng chuẩn xác.\n"
-            "• Auto Phiêu Lưu: Mở sẵn Vượt Ải Mê Cung. Tự qua ải và chống kẹt đuốc."
+            "• Không thu nhỏ (minimize) giả lập xuống taskbar vì Windows sẽ ngắt\n"
+            "  luồng đồ họa. Bạn chỉ cần để các cửa sổ khác đè lên trên thoải mái.\n"
+            "• 2 Màn hình: Đặt trọn giả lập ở 1 màn, tránh kéo lệch ranh giới 2 màn."
         )
         ctk.CTkLabel(
             f2, text=txt2, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
-        ).pack(anchor="w", padx=14, pady=(0, 10))
+        ).pack(anchor="w", padx=14, pady=(0, 8))
 
-        # Khung 3: Phím tắt & Liên hệ Discord
+        # Khung 3: Hướng dẫn 3 tính năng
         f3 = ctk.CTkFrame(self, fg_color="#151c28", border_width=1, border_color="#243044", corner_radius=10)
-        f3.pack(fill="x", padx=18, pady=5)
+        f3.pack(fill="x", padx=18, pady=4)
         ctk.CTkLabel(
             f3,
-            text="⌨ Phím Tắt & Liên Hệ Hỗ Trợ",
+            text="3 Chế Độ Hoạt Động",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color="#38bdf8",
-        ).pack(anchor="w", padx=14, pady=(10, 4))
+        ).pack(anchor="w", padx=14, pady=(8, 3))
         txt3 = (
-            "• Phím F8: Bật / Tắt Auto nhanh (Phím tắt toàn cục)\n"
-            "• Hỗ trợ, góp ý & giải đáp thắc mắc: Discord: 9m0m"
+            "• Auto Rally: Mở sẵn Sa Hải Mê Thành. Tự động thu phóng (🔍-)\n"
+            "  và canh 5 phút tổng tấn công đánh boss liên tục.\n"
+            "• Auto Câu Cá: Mở sẵn hồ câu cá. Tự quăng cần và kéo cá rãnh vàng.\n"
+            "• Auto Phiêu Lưu: Mở sẵn Mê Cung. Tự vượt ải và chống kẹt đuốc."
         )
         ctk.CTkLabel(
             f3, text=txt3, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
-        ).pack(anchor="w", padx=14, pady=(0, 10))
+        ).pack(anchor="w", padx=14, pady=(0, 8))
+
+        # Khung 4: Phím tắt & Liên hệ Discord
+        f4 = ctk.CTkFrame(self, fg_color="#151c28", border_width=1, border_color="#243044", corner_radius=10)
+        f4.pack(fill="x", padx=18, pady=4)
+        ctk.CTkLabel(
+            f4,
+            text="Phím Tắt & Liên Hệ Hỗ Trợ",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color="#38bdf8",
+        ).pack(anchor="w", padx=14, pady=(8, 3))
+        txt4 = (
+            "• Phím F8: Bật / Tắt Auto nhanh (Phím tắt toàn cục)\n"
+            "• Hỗ trợ, góp ý & liên hệ: Discord: 9m0m"
+        )
+        ctk.CTkLabel(
+            f4, text=txt4, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
+        ).pack(anchor="w", padx=14, pady=(0, 8))
 
         # Nút Đóng
         btn_close = ctk.CTkButton(
             self,
             text="ĐÃ HIỂU",
-            height=36,
+            height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             fg_color="#0284c7",
             hover_color="#0369a1",
@@ -139,7 +155,7 @@ class HelpDialog(ctk.CTkToplevel):
             text_color="#ffffff",
             command=self.destroy,
         )
-        btn_close.pack(fill="x", padx=18, pady=(12, 14))
+        btn_close.pack(fill="x", padx=18, pady=(10, 12))
 
 
 class AutoApp(ctk.CTk):
