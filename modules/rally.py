@@ -324,6 +324,57 @@ def scan_and_join_map_rallies(
     return None
 
 
+def ensure_map_overview(
+    sct: mss.MSS,
+    vp: Tuple[int, int, int, int],
+    adb: ADBManager,
+    stop_event: threading.Event,
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> bool:
+    """
+    Đảm bảo bản đồ Sa Hải Mê Thành luôn ở chế độ toàn cảnh rộng nhất.
+    Tự động chạm vào nút Kính Lúp dấu trừ ở góc dưới trái (Rel X: 0.084, Rel Y: 0.770)
+    để mở toàn cảnh 4 phe nếu người dùng quên chưa bấm.
+    """
+    if stop_event.is_set():
+        return False
+
+    gw_l, gw_t, gw_w, gw_h = vp
+    click_x = int(gw_l + gw_w * getattr(config, "RALLY_ZOOM_BTN_REL_X", 0.084))
+    click_y = int(gw_t + gw_h * getattr(config, "RALLY_ZOOM_BTN_REL_Y", 0.770))
+
+    zoom_tpl = assets.get_zoom_btn_template()
+    if zoom_tpl is not None:
+        roi_y1 = int(gw_t + gw_h * 0.68)
+        roi_y2 = int(gw_t + gw_h * 0.85)
+        roi_x1 = int(gw_l + gw_w * 0.01)
+        roi_x2 = int(gw_l + gw_w * 0.22)
+        roi_crop = safe_grab(sct, {"left": roi_x1, "top": roi_y1, "width": roi_x2 - roi_x1, "height": roi_y2 - roi_y1})
+        if roi_crop is not None:
+            best_val = 0.0
+            best_pt = None
+            for sc in [0.8, 0.9, 1.0, 1.1, 1.2]:
+                cur_w = int(zoom_tpl.shape[1] * sc)
+                cur_h = int(zoom_tpl.shape[0] * sc)
+                if cur_w >= roi_crop.shape[1] or cur_h >= roi_crop.shape[0]:
+                    continue
+                scaled = cv2.resize(zoom_tpl, (cur_w, cur_h))
+                res = cv2.matchTemplate(roi_crop, scaled, cv2.TM_CCOEFF_NORMED)
+                _, max_v, _, max_l = cv2.minMaxLoc(res)
+                if max_v > best_val:
+                    best_val = max_v
+                    best_pt = (roi_x1 + max_l[0] + cur_w // 2, roi_y1 + max_l[1] + cur_h // 2)
+
+            if best_val >= 0.60 and best_pt is not None:
+                click_x, click_y = best_pt
+
+    if log_cb:
+        log_cb("Tự động kích hoạt toàn cảnh bản đồ (Kính lúp dấu trừ)...")
+    _adb_tap(adb, vp, click_x, click_y, "Kính lúp toàn cảnh", log_cb)
+    _sleep(0.4, stop_event)
+    return True
+
+
 def run_rally_loop(
     adb: ADBManager,
     get_vp_func: Callable[[], Optional[Tuple[int, int, int, int]]],
@@ -334,6 +385,9 @@ def run_rally_loop(
     log_cb("Khởi động Auto Rally (Tổng Tấn Công)...")
     sct = mss.mss()
 
+    is_first_cycle = True
+    last_zoom_check = 0.0
+
     while not stop_event.is_set():
         raw_vp = get_vp_func()
         if not raw_vp:
@@ -343,8 +397,17 @@ def run_rally_loop(
 
         vp = _get_effective_vp(sct, raw_vp)
 
+        # Tự động kích hoạt toàn cảnh bản đồ 4 phe khi bắt đầu hoặc định kỳ 60s
+        now = time.time()
+        if is_first_cycle or (now - last_zoom_check > 60.0):
+            ensure_map_overview(sct, vp, adb, stop_event, log_cb if is_first_cycle else None)
+            is_first_cycle = False
+            last_zoom_check = now
+
         # 1. Kiểm tra nhận quà nếu trận trước vừa xong
         if _check_and_claim_reward(sct, vp, adb, stop_event, log_cb):
+            # Sau khi nhận quà quay lại map, đảm bảo góc nhìn vẫn là toàn cảnh
+            ensure_map_overview(sct, vp, adb, stop_event, None)
             continue
 
         # 2. Quét và bấm Rally

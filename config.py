@@ -109,6 +109,10 @@ RALLY_MAIN_BTN_REL_Y_MAX: float = 0.970
 RALLY_CLAIM_REWARD_X: float = 0.500
 RALLY_CLAIM_REWARD_Y: float = 0.838
 
+# Nút Kính Lúp dấu trừ (Thu nhỏ về bản đồ toàn cảnh Sa Hải Mê Thành)
+RALLY_ZOOM_BTN_REL_X: float = 0.084
+RALLY_ZOOM_BTN_REL_Y: float = 0.770
+
 # Vùng kiểm tra nút "Xác Nhận" nhận quà
 RALLY_REWARD_BTN_REL_X_MIN: float = 0.350
 RALLY_REWARD_BTN_REL_X_MAX: float = 0.650
