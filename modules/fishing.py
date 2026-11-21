@@ -58,11 +58,11 @@ def analyze_button_colors(btn_bgr: np.ndarray) -> Tuple[int, int, int]:
     )
     green_px = int(np.count_nonzero(green_mask))
 
-    grey_mask = cv2.inRange(
-        hsv,
-        np.array(config.HSV_WAIT_GREY_LOWER, dtype=np.uint8),
-        np.array(config.HSV_WAIT_GREY_UPPER, dtype=np.uint8),
-    )
+    s_channel = hsv[:, :, 1]
+    v_channel = hsv[:, :, 2]
+    grey_mask = (s_channel < config.GREY_SATURATION_MAX) & (
+        v_channel >= config.GREY_VALUE_MIN
+    ) & (v_channel <= config.GREY_VALUE_MAX)
     grey_px = int(np.count_nonzero(grey_mask))
 
     purple_mask = cv2.inRange(
@@ -191,14 +191,19 @@ def run_fishing_loop(
         gw_l, gw_t, gw_w, gw_h = vp
 
         # Tính toán tọa độ và vùng quét theo tỉ lệ chuẩn config
+        btn_screen_x = int(gw_l + gw_w * config.BUTTON_REL_X)
+        btn_screen_y = int(gw_t + gw_h * config.BUTTON_REL_Y)
+        claim_screen_x = int(gw_l + gw_w * config.CLAIM_REL_X)
+        claim_screen_y = int(gw_t + gw_h * config.CLAIM_REL_Y)
+        card_screen_x = int(gw_l + gw_w * config.CARD_REL_X)
+        card_screen_y = int(gw_t + gw_h * config.CARD_REL_Y)
+
         btn_box = {
-            "left": int(gw_l + gw_w * config.BUTTON_REL_X_MIN),
-            "top": int(gw_t + gw_h * config.BUTTON_REL_Y_MIN),
-            "width": max(1, int(gw_w * (config.BUTTON_REL_X_MAX - config.BUTTON_REL_X_MIN))),
-            "height": max(1, int(gw_h * (config.BUTTON_REL_Y_MAX - config.BUTTON_REL_Y_MIN))),
+            "top": btn_screen_y - 30,
+            "left": btn_screen_x - 30,
+            "width": 60,
+            "height": 60,
         }
-        btn_screen_x = int(gw_l + gw_w * config.BUTTON_CLICK_REL_X)
-        btn_screen_y = int(gw_t + gw_h * config.BUTTON_CLICK_REL_Y)
 
         slider_box = {
             "left": int(gw_l + gw_w * config.SLIDER_REL_X_MIN),
@@ -208,16 +213,11 @@ def run_fishing_loop(
         }
 
         claim_box = {
-            "left": int(gw_l + gw_w * config.CLAIM_REL_X_MIN),
-            "top": int(gw_t + gw_h * config.CLAIM_REL_Y_MIN),
-            "width": max(1, int(gw_w * (config.CLAIM_REL_X_MAX - config.CLAIM_REL_X_MIN))),
-            "height": max(1, int(gw_h * (config.CLAIM_REL_Y_MAX - config.CLAIM_REL_Y_MIN))),
+            "top": claim_screen_y - 15,
+            "left": claim_screen_x - 30,
+            "width": 60,
+            "height": 30,
         }
-        claim_screen_x = int(gw_l + gw_w * config.CLAIM_CLICK_REL_X)
-        claim_screen_y = int(gw_t + gw_h * config.CLAIM_CLICK_REL_Y)
-
-        card_screen_x = int(gw_l + gw_w * 0.500)
-        card_screen_y = int(gw_t + gw_h * 0.480)
 
         now = time.time()
 

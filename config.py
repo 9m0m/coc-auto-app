@@ -185,6 +185,7 @@ RALLY_DELAY_AFTER_SCROLL_CLICK: float = 0.40
 
 # Thời gian nghỉ giữa các lần quét khi ở trạng thái chờ
 RALLY_DELAY_IDLE_SLEEP: float = 0.40
+RALLY_SCAN_INTERVAL: float = 0.40
 
 # Thời gian khóa bỏ qua ô đã đầy (4/4) trên Mapview
 RALLY_FULL_TILE_COOLDOWN: float = 60.0

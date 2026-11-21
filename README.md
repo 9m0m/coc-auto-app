@@ -1,36 +1,48 @@
-# Clash of Critters - Auto App (Hybrid Edition)
+# COC AutoMaster
 
-Ứng dụng Macro và Tự động hóa thông minh cho game **Clash of Critters** trên các trình giả lập Android (BlueStacks 5, LDPlayer 9/5/4, MuMu Player, NoxPlayer).
+Ứng dụng tự động hóa thông minh cho game Clash of Critters trên BlueStacks 5 và các trình giả lập Android (LDPlayer, MuMu, Nox).
+Sử dụng công nghệ Hybrid (nhận diện hình ảnh siêu tốc + chạm ngầm qua ADB), hoàn toàn không chiếm hay giật chuột máy tính.
 
-## 🌟 Điểm nổi bật
-- **100% Không Chiếm Chuột (Background / Non-intrusive Tap):** Sử dụng cơ chế Hybrid (Nhận diện siêu tốc bằng MSS + Bấm ngầm trực tiếp qua ADB). Con trỏ chuột Windows hoàn toàn rảnh tay để bạn làm việc, lướt web hoặc chơi game khác.
-- **Tự động dò tìm cổng giả lập (Zero-Config):** Tự động phát hiện cổng kết nối ADB của BlueStacks, LDPlayer, MuMu mà người dùng không cần cấu hình thủ công.
-- **Tích hợp sẵn file chạy ADB:** Đã bao gồm binary ADB trong thư mục `binaries/`, người dùng tải về là chạy ngay, không cần cài thêm Python hay SDK Android.
+---
 
-## 📁 Cấu trúc thư mục chuẩn (Clean Architecture)
-```text
-coc-auto-app/
-├── core/                        # Nền tảng lõi
-│   ├── adb_manager.py           # Quản lý và kết nối ADB ngầm
-│   ├── viewport.py              # Xử lý cửa sổ giả lập & ánh xạ tọa độ
-│   └── vision.py                # Quét màn hình siêu tốc (MSS + OpenCV)
-│
-├── modules/                     # Các chức năng game
-│   ├── rally.py                 # Auto Tổng Tấn Công (Rally)
-│   ├── fishing.py               # Auto Câu Cá
-│   └── adventure.py             # Auto Phiêu Lưu
-│
-├── ui/                          # Giao diện người dùng đồ họa (GUI)
-├── assets/                      # Ảnh mẫu và tài nguyên nhúng
-├── binaries/                    # File thực thi adb.exe đi kèm
-├── test_adb_click.py            # Script kiểm thử click ngầm
-└── README.md
-```
+## Tải Về
 
-## 🚀 Hướng dẫn kiểm tra nhanh
-1. Mở BlueStacks hoặc LDPlayer và vào game Clash of Critters.
-2. Chạy lệnh kiểm tra click ngầm:
-```bash
-python test_adb_click.py
-```
-3. Quan sát: Tool sẽ bấm thử vào tâm màn hình giả lập mà con trỏ chuột của bạn hoàn toàn đứng yên!
+Tải phiên bản mới nhất tại:
+**[GitHub Releases - COC AutoMaster](https://github.com/9m0m/coc-auto-app/releases/latest)**
+
+- Tải file `COC_AutoMaster.exe` về máy và mở lên chạy trực tiếp (không cần cài đặt Python hay môi trường phức tạp).
+
+---
+
+## Cài Đặt Giả Lập (Bắt buộc)
+
+Để ứng dụng có thể gửi thao tác chạm ngầm vào game:
+
+1. Mở **BlueStacks 5** -> vào **Cài đặt** (biểu tượng bánh răng) -> chọn mục **Nâng cao**.
+2. Bật tùy chọn **Cầu gỡ lỗi Android (Android Debug Bridge - ADB)**.
+3. Khuyến nghị thiết lập độ phân giải màn hình giả lập: **1600 x 900** (Landscape).
+
+---
+
+## Hướng Dẫn Sử Dụng
+
+1. Mở giả lập và vào game Clash of Critters.
+2. Khởi động ứng dụng **COC AutoMaster**. Ứng dụng sẽ tự động dò tìm và kết nối tới giả lập.
+3. Chọn chế độ tự động cần dùng:
+   - **Auto Rally**: Mở sẵn giao diện Sa Hải Mê Thành. Tự động canh giờ, nhấn Tham gia tổng tấn công và tự động thu phóng bản đồ overview.
+   - **Auto Câu Cá**: Mở sẵn màn hình hồ câu cá. Tự động quăng cần, canh nhịp cá cắn và kéo thanh trượt theo rãnh vàng.
+   - **Auto Phiêu Lưu**: Mở sẵn màn hình Vượt Ải / Mê Cung Cổ Vật. Tự động tìm đường, vượt ải và chống kẹt đuốc.
+4. Bấm **BẮT ĐẦU** hoặc nhấn phím **F8** để kích hoạt. Bấm tiếp **F8** khi muốn tạm dừng.
+
+---
+
+## Phím Tắt
+
+- **F8 (Global Hotkey)**: Phím tắt thông minh toàn hệ thống. Bấm `F8` để Bắt đầu, bấm tiếp `F8` để Dừng khẩn cấp ngay cả khi đang thu nhỏ ứng dụng.
+
+---
+
+## Hỗ Trợ & Liên Hệ
+
+- Discord: **9m0m**
+- Bấm vào nút `[ ? ]` ở góc trên bên phải giao diện ứng dụng để mở bảng hướng dẫn chi tiết.

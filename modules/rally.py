@@ -425,6 +425,6 @@ def run_rally_loop(
             _sleep(0.5, stop_event)
             continue
 
-        _sleep(config.RALLY_SCAN_INTERVAL, stop_event)
+        _sleep(getattr(config, "RALLY_SCAN_INTERVAL", config.RALLY_DELAY_IDLE_SLEEP), stop_event)
 
     log_cb("Đã dừng Auto Rally.")
