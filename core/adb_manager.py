@@ -19,18 +19,46 @@ def get_base_dir() -> str:
 
 
 def find_adb_binary() -> str:
-    """Tìm file thực thi adb.exe trong dự án hoặc trong hệ thống."""
-    # 1. Tìm trong binaries/ của app
+    """Tìm file thực thi adb.exe trong dự án hoặc trong hệ thống.
+    Khi chạy dưới dạng PyInstaller .exe (frozen), copy adb sang %LOCALAPPDATA%
+    để tránh khóa thư mục tạm _MEIPASS gây lỗi 'Failed to remove temporary directory'.
+    """
+    # 1. Nếu là PyInstaller frozen .exe
+    if getattr(sys, "frozen", False):
+        try:
+            local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+            target_bin_dir = os.path.join(local_appdata, "COC_AutoMaster", "bin")
+            os.makedirs(target_bin_dir, exist_ok=True)
+
+            target_adb = os.path.join(target_bin_dir, "adb.exe")
+            target_dll = os.path.join(target_bin_dir, "AdbWinApi.dll")
+
+            src_bin_dir = os.path.join(sys._MEIPASS, "binaries")  # type: ignore
+            src_adb = os.path.join(src_bin_dir, "adb.exe")
+            src_dll = os.path.join(src_bin_dir, "AdbWinApi.dll")
+
+            import shutil
+            if os.path.isfile(src_adb) and (not os.path.isfile(target_adb) or os.path.getsize(target_adb) != os.path.getsize(src_adb)):
+                shutil.copy2(src_adb, target_adb)
+            if os.path.isfile(src_dll) and (not os.path.isfile(target_dll) or os.path.getsize(target_dll) != os.path.getsize(src_dll)):
+                shutil.copy2(src_dll, target_dll)
+
+            if os.path.isfile(target_adb):
+                return target_adb
+        except Exception:
+            pass
+
+    # 2. Tìm trong binaries/ của app (môi trường phát triển python thường)
     local_bin = os.path.join(get_base_dir(), "binaries", "adb.exe")
     if os.path.isfile(local_bin):
         return local_bin
 
-    # 2. Tìm trong BlueStacks_nxt nếu có
+    # 3. Tìm trong BlueStacks_nxt nếu có
     bs_adb = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
     if os.path.isfile(bs_adb):
         return bs_adb
 
-    # 3. Mặc định gọi "adb" từ PATH
+    # 4. Mặc định gọi "adb" từ PATH
     return "adb"
 
 

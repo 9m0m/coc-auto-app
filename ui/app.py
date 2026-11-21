@@ -36,9 +36,23 @@ class AutoApp(ctk.CTk):
         self.title("COC AutoMaster")
         self.geometry("520x650")
         self.resizable(False, False)
-        self.configure(fg_color="#0b101b")  # Nền tối sâu Acrylic
+        self.configure(fg_color="#080d18")  # Nền tối sâu Frosted Acrylic
 
-        # Kích hoạt hiệu ứng kính mờ Windows 11 Acrylic Blur / Glass
+        # Kích hoạt hiệu ứng kính mờ Windows 11 Acrylic Blur / Glass & Dark Mode Title Bar
+        try:
+            import ctypes
+            from ctypes import c_int, byref, sizeof
+            self.update()
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            # 1. Dark Mode title bar
+            dark = c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, byref(dark), sizeof(dark))
+            # 2. Windows 11 System Backdrop Acrylic (3 = Acrylic, 2 = Mica)
+            acrylic = c_int(3)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 38, byref(acrylic), sizeof(acrylic))
+        except Exception:
+            pass
+
         if pywinstyles is not None:
             try:
                 pywinstyles.apply_style(self, "acrylic")
@@ -94,29 +108,20 @@ class AutoApp(ctk.CTk):
             title_box,
             text="HYBRID",
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color="#182438",
+            fg_color="#0f2038",
             text_color="#38bdf8",
             corner_radius=8,
-            padx=9,
+            padx=10,
             pady=3,
         )
         badge.pack(side="left", padx=10)
-
-        # Nhãn trạng thái không chiếm chuột
-        sub_tag = ctk.CTkLabel(
-            header,
-            text="Chạy Ngầm • Rảnh Chuột",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            text_color="#64748b",
-        )
-        sub_tag.pack(side="right")
 
     def _build_device_glass_card(self):
         """Card trạng thái giả lập phong cách Frosted Glass với viền phản quang."""
         self.card_device = ctk.CTkFrame(
             self,
-            corner_radius=16,
-            fg_color="#131b2e",
+            corner_radius=18,
+            fg_color="#0f172a",
             border_width=1,
             border_color="#24344d",
         )
@@ -138,7 +143,7 @@ class AutoApp(ctk.CTk):
             status_row,
             text="Đang tìm kiếm giả lập...",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            text_color="#f1f5f9",
+            text_color="#f8fafc",
         )
         self.lbl_emulator_name.pack(side="left")
 
@@ -161,12 +166,12 @@ class AutoApp(ctk.CTk):
             text="Quét Giả Lập",
             height=36,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#1a2538",
-            hover_color="#26354d",
+            fg_color="#1e293b",
+            hover_color="#334155",
             border_width=1,
-            border_color="#334661",
+            border_color="#475569",
             corner_radius=10,
-            text_color="#e2e8f0",
+            text_color="#f8fafc",
             command=self.refresh_connection,
         )
         self.btn_rescan.pack(side="left", fill="x", expand=True, padx=(0, 6))
@@ -176,10 +181,10 @@ class AutoApp(ctk.CTk):
             text="Thử Click Ngầm",
             height=36,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#0369a1",
-            hover_color="#0284c7",
+            fg_color="#007aff",
+            hover_color="#0062cc",
             border_width=1,
-            border_color="#38bdf8",
+            border_color="#60a5fa",
             corner_radius=10,
             text_color="#ffffff",
             command=self.test_single_click,
@@ -190,8 +195,8 @@ class AutoApp(ctk.CTk):
         """Thanh chọn chế độ chuẩn phong cách iOS Segmented Capsule Control."""
         card_mode = ctk.CTkFrame(
             self,
-            corner_radius=16,
-            fg_color="#131b2e",
+            corner_radius=18,
+            fg_color="#0f172a",
             border_width=1,
             border_color="#24344d",
         )
@@ -211,7 +216,7 @@ class AutoApp(ctk.CTk):
         capsule_box = ctk.CTkFrame(
             card_mode,
             corner_radius=12,
-            fg_color="#090e1a",
+            fg_color="#070c18",
             border_width=1,
             border_color="#1e293b",
         )
@@ -226,10 +231,10 @@ class AutoApp(ctk.CTk):
             text="Auto Rally",
             height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color="#0284c7",
-            hover_color="#0369a1",
+            fg_color="#007aff",
+            hover_color="#0062cc",
             border_width=1,
-            border_color="#38bdf8",
+            border_color="#60a5fa",
             corner_radius=9,
             text_color="#ffffff",
             command=lambda: self._select_mode("rally"),
@@ -267,10 +272,10 @@ class AutoApp(ctk.CTk):
         # Thanh chỉ báo trạng thái kích hoạt rõ ràng (Frosted Pill Chip)
         desc_box = ctk.CTkFrame(
             card_mode,
-            fg_color="#0d1526",
+            fg_color="#091122",
             corner_radius=8,
             border_width=1,
-            border_color="#1a2538",
+            border_color="#1b2a47",
         )
         desc_box.pack(fill="x", padx=14, pady=(0, 14))
 
@@ -299,10 +304,10 @@ class AutoApp(ctk.CTk):
             "text_color": "#94a3b8",
         }
         active_cfg = {
-            "fg_color": "#0284c7",
-            "hover_color": "#0369a1",
+            "fg_color": "#007aff",
+            "hover_color": "#0062cc",
             "border_width": 1,
-            "border_color": "#38bdf8",
+            "border_color": "#60a5fa",
             "text_color": "#ffffff",
         }
 
@@ -339,12 +344,12 @@ class AutoApp(ctk.CTk):
             btn_box,
             text="▶ BẮT ĐẦU (F1)",
             height=46,
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color="#059669",
-            hover_color="#10b981",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            fg_color="#10b981",
+            hover_color="#059669",
             border_width=1,
             border_color="#34d399",
-            corner_radius=12,
+            corner_radius=13,
             text_color="#ffffff",
             command=self.start_auto,
         )
@@ -355,12 +360,12 @@ class AutoApp(ctk.CTk):
             btn_box,
             text="⏸ TẠM DỪNG (F2)",
             height=46,
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color="#dc2626",
-            hover_color="#ef4444",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            fg_color="#ef4444",
+            hover_color="#dc2626",
             border_width=1,
             border_color="#f87171",
-            corner_radius=12,
+            corner_radius=13,
             text_color="#ffffff",
             command=self.stop_auto,
             state="disabled",
@@ -371,7 +376,7 @@ class AutoApp(ctk.CTk):
         """Khung Console nhật ký phong cách Apple Terminal Sheet."""
         log_box = ctk.CTkFrame(
             self,
-            corner_radius=16,
+            corner_radius=18,
             fg_color="#070c18",
             border_width=1,
             border_color="#24344d",
@@ -538,7 +543,7 @@ class AutoApp(ctk.CTk):
     def _on_worker_finished(self):
         """Khôi phục trạng thái nút bấm khi auto dừng."""
         self.is_running = False
-        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#059669", state="normal")
+        self.btn_start.configure(text="▶ BẮT ĐẦU (F1)", fg_color="#10b981", state="normal")
         self.btn_stop.configure(state="disabled")
         self.btn_mode_rally.configure(state="normal")
         self.btn_mode_fishing.configure(state="normal")
