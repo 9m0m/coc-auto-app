@@ -574,45 +574,48 @@ class AutoApp(ctk.CTk):
         self.txt_log.delete("1.0", "end")
 
     def refresh_connection(self):
-        """Quét cửa sổ game và kết nối cổng ADB tự động."""
-        self.log("Đang quét giả lập và kết nối ADB...")
-        self.emulator_win = find_emulator_window()
+        """Quét cửa sổ game và kết nối cổng ADB tự động trên luồng ngầm (tránh đơ UI)."""
+        def _worker():
+            self.log("Đang quét giả lập và kết nối ADB...")
+            self.emulator_win = find_emulator_window()
 
-        if not self.emulator_win:
-            self.lbl_status_dot.configure(text_color="#ef4444")
-            self.lbl_emulator_name.configure(text="Chưa tìm thấy giả lập!")
-            self.lbl_details.configure(text="Vui lòng mở BlueStacks 5 hoặc LDPlayer lên trước.")
-            self.log("[Cảnh báo] Chưa tìm thấy cửa sổ giả lập trên màn hình.")
-            return
+            if not self.emulator_win:
+                self.lbl_status_dot.configure(text_color="#ef4444")
+                self.lbl_emulator_name.configure(text="Chưa tìm thấy giả lập!")
+                self.lbl_details.configure(text="Vui lòng mở BlueStacks 5 hoặc LDPlayer lên trước.")
+                self.log("[Cảnh báo] Chưa tìm thấy cửa sổ giả lập trên màn hình.")
+                return
 
-        hwnd = self.emulator_win._hWnd
-        title = self.emulator_win.title
-        self.game_vp = get_game_viewport(hwnd, title)
+            hwnd = self.emulator_win._hWnd
+            title = self.emulator_win.title
+            self.game_vp = get_game_viewport(hwnd, title)
 
-        serial = self.adb.auto_connect(emulator_hint=title)
-        if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
-            sw, sh = self.adb.screen_size
-            vw, vh = self.game_vp[2], self.game_vp[3]
-            # Tự động đồng bộ hướng xoay (Portrait / Landscape) giữa Viewport và Android
-            if (vw < vh and sw > sh) or (vw > vh and sw < sh):
-                sw, sh = sh, sw
-                self.adb.screen_size = (sw, sh)
+            serial = self.adb.auto_connect(emulator_hint=title)
+            if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
+                sw, sh = self.adb.screen_size
+                vw, vh = self.game_vp[2], self.game_vp[3]
+                # Tự động đồng bộ hướng xoay (Portrait / Landscape) giữa Viewport và Android
+                if (vw < vh and sw > sh) or (vw > vh and sw < sh):
+                    sw, sh = sh, sw
+                    self.adb.screen_size = (sw, sh)
 
-            self.lbl_status_dot.configure(text_color="#10b981")
-            self.lbl_emulator_name.configure(text=f"{title}")
-            self.lbl_details.configure(
-                text=f"Cổng: {serial} • Android: {sw}x{sh} • Viewport: {vw}x{vh}"
-            )
-            self.log(f"Đã kết nối thành công: {title} ({serial})")
-        elif serial:
-            self.lbl_status_dot.configure(text_color="#f59e0b")
-            self.lbl_emulator_name.configure(text=f"{title} (Cần bật ADB)")
-            self.lbl_details.configure(text="Hãy bật 'Cầu gỡ lỗi Android' trong Cài đặt BlueStacks.")
-            self.log("Cửa sổ giả lập sẵn sàng nhưng ADB chưa mở. Hãy kiểm tra Cài đặt -> Nâng cao.")
-        else:
-            self.lbl_status_dot.configure(text_color="#f59e0b")
-            self.lbl_emulator_name.configure(text=f"{title} (Đang dò cổng)")
-            self.lbl_details.configure(text="Đang thử các cổng ADB khác...")
+                self.lbl_status_dot.configure(text_color="#10b981")
+                self.lbl_emulator_name.configure(text=f"{title}")
+                self.lbl_details.configure(
+                    text=f"Cổng: {serial} • Android: {sw}x{sh} • Viewport: {vw}x{vh}"
+                )
+                self.log(f"Đã kết nối thành công: {title} ({serial})")
+            elif serial:
+                self.lbl_status_dot.configure(text_color="#f59e0b")
+                self.lbl_emulator_name.configure(text=f"{title} (Cần bật ADB)")
+                self.lbl_details.configure(text="Hãy bật 'Cầu gỡ lỗi Android' trong Cài đặt giả lập.")
+                self.log("Cửa sổ giả lập sẵn sàng nhưng ADB chưa mở. Hãy kiểm tra Cài đặt giả lập.")
+            else:
+                self.lbl_status_dot.configure(text_color="#f59e0b")
+                self.lbl_emulator_name.configure(text=f"{title} (Đang dò cổng)")
+                self.lbl_details.configure(text="Đang thử các cổng ADB khác...")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def test_single_click(self):
         """Chạm ngầm thử một phát vào tâm game để kiểm tra phản hồi."""
