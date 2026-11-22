@@ -191,10 +191,12 @@ class ADBManager:
                 devices.append(parts[0])
         return devices
 
-    def auto_connect(self) -> Optional[str]:
+    def auto_connect(self, emulator_hint: Optional[str] = None) -> Optional[str]:
         """
         Tự động quét và kết nối tới giả lập đang mở.
-        Trả về serial (ví dụ: '127.0.0.1:5555') hoặc None nếu không kết nối được.
+        Sử dụng TCP socket ping siêu tốc (0.08s) để lọc các cổng thực sự mở,
+        kết hợp ưu tiên loại giả lập đang hiển thị để kết nối ngay lập tức (dưới 0.2s),
+        tránh bị treo 20-30 giây khi máy có nhiều instance BlueStacks cũ đã tắt.
         """
         # Kiểm tra xem có thiết bị nào đã sẵn sàng chưa
         ready = self.get_connected_devices()
@@ -203,9 +205,37 @@ class ADBManager:
             self.refresh_screen_size()
             return self.active_serial
 
+        import socket
+
+        def _is_port_open(host: str, port: int, timeout: float = 0.08) -> bool:
+            try:
+                with socket.create_connection((host, int(port)), timeout=timeout):
+                    return True
+            except Exception:
+                return False
+
         # Thử kết nối lần lượt các candidate ports
         candidates = self.get_candidate_ports()
+
+        # Ưu tiên các cổng tương ứng với loại giả lập đang phát hiện trên màn hình
+        if emulator_hint:
+            hl = emulator_hint.lower()
+            if any(k in hl for k in ["ldplayer", "ld", "dnplayer"]):
+                candidates.sort(key=lambda c: 0 if "ld" in c["name"].lower() else 1)
+            elif any(k in hl for k in ["mumu", "nemu"]):
+                candidates.sort(key=lambda c: 0 if "mumu" in c["name"].lower() else 1)
+            elif "nox" in hl:
+                candidates.sort(key=lambda c: 0 if "nox" in c["name"].lower() else 1)
+            elif "memu" in hl:
+                candidates.sort(key=lambda c: 0 if "memu" in c["name"].lower() else 1)
+            elif any(k in hl for k in ["blue", "bst"]):
+                candidates.sort(key=lambda c: 0 if "blue" in c["name"].lower() else 1)
+
         for cand in candidates:
+            # Bỏ qua ngay các cổng không có dịch vụ nào lắng nghe (tránh bị delay 2.0s mỗi cổng đóng)
+            if not _is_port_open(cand["host"], int(cand["port"])):
+                continue
+
             serial = cand["serial"]
             self.run_cmd(["connect", serial], timeout=2.0)
             if serial in self.get_connected_devices():

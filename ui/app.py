@@ -589,7 +589,7 @@ class AutoApp(ctk.CTk):
         title = self.emulator_win.title
         self.game_vp = get_game_viewport(hwnd, title)
 
-        serial = self.adb.auto_connect()
+        serial = self.adb.auto_connect(emulator_hint=title)
         if serial and self.adb.screen_size and self.adb.screen_size[0] > 0:
             sw, sh = self.adb.screen_size
             vw, vh = self.game_vp[2], self.game_vp[3]
