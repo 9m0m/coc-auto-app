@@ -121,9 +121,10 @@ def _get_effective_vp(sct: mss.MSS, raw_vp: Tuple[int, int, int, int]) -> Tuple[
     return _effective_vp
 
 
-def _is_tile_in_dict(tile: Tuple[int, int], target_dict: Dict[Tuple[int, int], float], threshold: int = 35) -> bool:
+def _is_tile_in_dict(tile: Tuple[int, int], target_dict: Dict[Tuple[int, int], float], threshold: int = 45) -> bool:
     tx, ty = tile
-    return any(abs(tx - cx) < threshold and abs(ty - cy) < threshold for cx, cy in target_dict.keys())
+    now = time.time()
+    return any(abs(tx - cx) < threshold and abs(ty - cy) < threshold for (cx, cy), exp in target_dict.items() if exp > now)
 
 
 def _check_and_claim_reward(sct: mss.MSS, vp: Tuple[int, int, int, int], adb: ADBManager, stop_event: threading.Event, log_cb: Optional[Callable[[str], None]] = None) -> bool:
@@ -314,6 +315,11 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         close_y = int(gw_t + gw_h * 0.955)
         _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất đồng minh (Nút X)", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        if _last_clicked_tile is not None:
+            cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+            _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+            if log_cb:
+                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đồng minh -> Khóa ô {int(cooldown)}s")
         _last_clicked_tile = None
         return True, False
 
@@ -338,6 +344,11 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         grey_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (0, 0, 100), (180, 40, 210))))
 
         if yellow_px > 2500:
+            if _last_clicked_tile is not None:
+                cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+                _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+                if log_cb:
+                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất thường -> Bỏ qua {int(cooldown)}s")
             _adb_tap(adb, vp, back_x, back_y, "Đóng bảng tấn công đất", log_cb)
             _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
             _last_clicked_tile = None
@@ -366,6 +377,11 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             return True, False
 
         # Không có nút hành động nào khác -> Đây là bảng "Ảo Ảnh" / Bảng xếp hạng cứ điểm (có nút Back)
+        if _last_clicked_tile is not None:
+            cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+            _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+            if log_cb:
+                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) không có Rally -> Bỏ qua {int(cooldown)}s")
         _adb_tap(adb, vp, back_x, back_y, "Đóng bảng Ảo Ảnh/Cứ điểm về Map", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
         _last_clicked_tile = None
@@ -444,8 +460,21 @@ def scan_and_join_map_rallies(
             return None
 
         is_pop, is_join = _handle_rally_detail_popup(sct, vp, adb, stop_event, log_cb)
+        if not is_pop:
+            # Thử kiểm tra lại lần 2 sau 0.35s phòng trường hợp giả lập lag mở popup chậm
+            if not _sleep(0.35, stop_event):
+                is_pop, is_join = _handle_rally_detail_popup(sct, vp, adb, stop_event, log_cb)
+
         if is_pop:
             return "JOINED" if is_join else "FULL"
+
+        # Nếu đã bấm mở nhưng không có bất kỳ popup nào xuất hiện (ô không tương tác / lag / đã kết thúc):
+        # Đưa ô này vào cooldown để tránh liên tục bấm và nhìn chăm chú vào ô đó
+        cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+        _full_tiles_cooldown[tile] = time.time() + cooldown
+        if log_cb:
+            log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Tạm bỏ qua {int(cooldown)}s")
+        _last_clicked_tile = None
         return "CLICKED"
 
     return None
