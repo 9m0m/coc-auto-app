@@ -177,6 +177,45 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     if screen_crop is None:
         return False, False
 
+    # 0. Type Alert: Hộp thoại thông báo hệ thống dạng Modal ("Xác Nhận")
+    # Ví dụ: "Tổng Tấn Công chưa hoàn thành. Không thể tấn công ô mục tiêu."
+    # Đặc điểm: Tiêu đề tím / nền hộp thoại sáng và Nút lớn màu xanh lá "Xác Nhận" ở giữa màn hình.
+    btn_modal_crop = screen_crop[int(gw_h * 0.55):int(gw_h * 0.72), int(gw_w * 0.20):int(gw_w * 0.80)]
+    hsv_modal = cv2.cvtColor(btn_modal_crop, cv2.COLOR_BGR2HSV)
+    green_mask_m = cv2.inRange(hsv_modal, np.array([35, 100, 100]), np.array([85, 255, 255]))
+    contours_m, _ = cv2.findContours(green_mask_m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    found_confirm_btn = None
+    for c in contours_m:
+        cx, cy, bw, bh = cv2.boundingRect(c)
+        if bw >= int(gw_w * 0.20) and bh >= 35 and (1.5 <= bw / bh <= 6.0):
+            confirm_x = int(gw_l + gw_w * 0.20 + cx + bw // 2)
+            confirm_y = int(gw_t + gw_h * 0.55 + cy + bh // 2)
+            found_confirm_btn = (confirm_x, confirm_y)
+            break
+
+    if found_confirm_btn is not None:
+        header_crop = screen_crop[int(gw_h * 0.30):int(gw_h * 0.42), int(gw_w * 0.10):int(gw_w * 0.90)]
+        hsv_h = cv2.cvtColor(header_crop, cv2.COLOR_BGR2HSV)
+        purple_px = np.count_nonzero(cv2.inRange(hsv_h, np.array([115, 50, 50]), np.array([165, 255, 255])))
+        body_crop = screen_crop[int(gw_h * 0.40):int(gw_h * 0.58), int(gw_w * 0.15):int(gw_w * 0.85)]
+
+        if purple_px > 2000 or np.mean(body_crop) > 150:
+            confirm_x, confirm_y = found_confirm_btn
+            if log_cb:
+                log_cb("Phát hiện thông báo 'Không thể tấn công ô mục tiêu' -> Bấm Xác Nhận")
+            _adb_tap(adb, vp, confirm_x, confirm_y, "Bấm nút Xác Nhận", log_cb)
+            _sleep(0.5, stop_event)
+
+            if _last_clicked_tile is not None:
+                cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+                _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+                if log_cb:
+                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) không thể tấn công -> Khóa ô {int(cooldown)}s")
+                _last_clicked_tile = None
+
+            return True, False
+
     # 1. Type A: Popup danh sách Rally
     tab = screen_crop[int(gw_h * 0.15):int(gw_h * 0.22), int(gw_w * 0.03):int(gw_w * 0.40)]
     top_dim = screen_crop[int(gw_h * 0.09):int(gw_h * 0.14), int(gw_w * 0.20):int(gw_w * 0.80)]
@@ -199,53 +238,67 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             btns.sort(key=lambda b: b[1])
             return btns
 
-        joined_any = False
-        cooldown_time = getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
-
-        # Nhịp 1: Quét và tham gia các Rally ở trang đầu (Rally 1 -> 4)
         green_btns = _get_green_btns(screen_crop)
-        if green_btns:
-            for idx, (btn_x, btn_y) in enumerate(green_btns):
-                if stop_event.is_set():
-                    break
-                _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally {idx+1}/{len(green_btns)}", log_cb)
-                joined_any = True
-                _sleep(0.35, stop_event)
 
-        # Vuốt cuộn trang lên để hiển thị các Rally thứ 5, 6... bị tràn bên dưới
-        swipe_x = int(gw_l + gw_w * 0.50)
-        swipe_y1 = int(gw_t + gw_h * 0.72)
-        swipe_y2 = int(gw_t + gw_h * 0.28)
-        _adb_swipe(adb, vp, swipe_x, swipe_y1, swipe_x, swipe_y2, 280, "Cuộn xem thêm Rally phía dưới", log_cb)
-        _sleep(0.40, stop_event)
+        # Xác thực xem có thực sự là danh sách Rally không (phải có nút xanh hoặc nút xám của các thẻ Rally)
+        card_crop_chk = screen_crop[int(gw_h * 0.22):int(gw_h * 0.85), int(gw_w * 0.55):int(gw_w * 0.95)]
+        hsv_chk = cv2.cvtColor(card_crop_chk, cv2.COLOR_BGR2HSV)
+        grey_mask_chk = cv2.inRange(hsv_chk, np.array([0, 0, 70]), np.array([180, 50, 210]))
+        contours_grey_chk, _ = cv2.findContours(grey_mask_chk, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        min_btn_w = int(gw_w * 0.16)
+        max_btn_w = int(gw_w * 0.40)
+        has_any_card = (len(green_btns) > 0 or any(min_btn_w <= cv2.boundingRect(c)[2] <= max_btn_w and 18 <= cv2.boundingRect(c)[3] <= 55 for c in contours_grey_chk))
 
-        # Nhịp 2: Quét lại sau khi cuộn để bấm các Rally mới lộ ra
-        screen_crop2 = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
-        if screen_crop2 is not None:
-            green_btns_p2 = _get_green_btns(screen_crop2)
-            if green_btns_p2:
-                for idx, (btn_x, btn_y) in enumerate(green_btns_p2):
+        if not has_any_card:
+            # Không phát hiện thẻ Rally nào ở cột bên phải -> Không phải bảng danh sách Rally
+            pass
+        else:
+            joined_any = False
+            cooldown_time = getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
+
+            # Nhịp 1: Quét và tham gia các Rally ở trang đầu (Rally 1 -> 4)
+            if green_btns:
+                for idx, (btn_x, btn_y) in enumerate(green_btns):
                     if stop_event.is_set():
                         break
-                    _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally bổ sung {idx+1}/{len(green_btns_p2)}", log_cb)
+                    _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally {idx+1}/{len(green_btns)}", log_cb)
                     joined_any = True
                     _sleep(0.35, stop_event)
 
-        if joined_any:
-            if _last_clicked_tile is not None:
-                _recently_joined_tiles[_last_clicked_tile] = time.time() + cooldown_time
-        else:
-            if _last_clicked_tile is not None:
-                _full_tiles_cooldown[_last_clicked_tile] = time.time() + getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
-                if log_cb:
-                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(getattr(config, 'RALLY_FULL_TILE_COOLDOWN', 30.0))}s")
+            # Vuốt cuộn trang lên để hiển thị các Rally thứ 5, 6... bị tràn bên dưới
+            swipe_x = int(gw_l + gw_w * 0.50)
+            swipe_y1 = int(gw_t + gw_h * 0.72)
+            swipe_y2 = int(gw_t + gw_h * 0.28)
+            _adb_swipe(adb, vp, swipe_x, swipe_y1, swipe_x, swipe_y2, 280, "Cuộn xem thêm Rally phía dưới", log_cb)
+            _sleep(0.40, stop_event)
 
-        safe_close_x = int(gw_l + gw_w * 0.50)
-        safe_close_y = int(gw_t + gw_h * 0.12)
-        _adb_tap(adb, vp, safe_close_x, safe_close_y, "Đóng Popup danh sách", log_cb)
-        _sleep(0.35, stop_event)
-        _last_clicked_tile = None
-        return True, joined_any
+            # Nhịp 2: Quét lại sau khi cuộn để bấm các Rally mới lộ ra
+            screen_crop2 = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+            if screen_crop2 is not None:
+                green_btns_p2 = _get_green_btns(screen_crop2)
+                if green_btns_p2:
+                    for idx, (btn_x, btn_y) in enumerate(green_btns_p2):
+                        if stop_event.is_set():
+                            break
+                        _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally bổ sung {idx+1}/{len(green_btns_p2)}", log_cb)
+                        joined_any = True
+                        _sleep(0.35, stop_event)
+
+            if joined_any:
+                if _last_clicked_tile is not None:
+                    _recently_joined_tiles[_last_clicked_tile] = time.time() + cooldown_time
+            else:
+                if _last_clicked_tile is not None:
+                    _full_tiles_cooldown[_last_clicked_tile] = time.time() + getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+                    if log_cb:
+                        log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(getattr(config, 'RALLY_FULL_TILE_COOLDOWN', 30.0))}s")
+
+            safe_close_x = int(gw_l + gw_w * 0.50)
+            safe_close_y = int(gw_t + gw_h * 0.12)
+            _adb_tap(adb, vp, safe_close_x, safe_close_y, "Đóng Popup danh sách", log_cb)
+            _sleep(0.35, stop_event)
+            _last_clicked_tile = None
+            return True, joined_any
 
     # 2. Type D: Bảng mỏ vàng phe ta (chỉ bấm nút [X] ở đáy khi xác nhận có thanh quân phòng thủ xanh > 1500px)
     crop_green_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.72), int(gw_w * 0.15):int(gw_w * 0.85)]
