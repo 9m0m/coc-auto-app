@@ -630,7 +630,7 @@ class AutoApp(ctk.CTk):
             if ok:
                 self.log(f"✅ [THÀNH CÔNG] Đã chạm ngầm vào game (Android: {ax}, {ay})! Chuột không di chuyển.")
             else:
-                self.log("❌ Lệnh chạm không gửi được.")
+                self.log("❌ Lệnh chạm không gửi được. Lưu ý: LDPlayer cần chọn 'Open remote connection' (Mở kết nối từ xa) & Bật Root trong Cài đặt!")
 
         threading.Thread(target=_worker, daemon=True).start()
 

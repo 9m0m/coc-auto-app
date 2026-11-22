@@ -44,36 +44,40 @@ Khi bật tính năng này, ứng dụng Auto có thể gửi tín hiệu chạm
 4. Nhấp nút **Lưu thay đổi** (Save changes) ở góc dưới cùng bên phải.
 
 ### 2. LDPlayer (LDPlayer 9 & 4)
-1. Mở LDPlayer, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở góc trên thanh công cụ bên phải.
-2. Nhấp chọn thẻ **Khác** (Other Settings) hoặc thẻ **Nâng cao** (Advanced).
+1. Mở LDPlayer, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở thanh công cụ bên phải.
+2. Nhấp chọn thẻ **Khác** (Others) ở danh mục dưới cùng bên trái.
 3. Tìm dòng **Gỡ lỗi ADB** (ADB debugging):
-   - Nếu đang hiển thị "Đóng" (Close): Nhấp chọn chuyển sang **"Mở kết nối cục bộ"** (Open local connection).
-   - Nếu đã hiển thị sẵn "Mở kết nối cục bộ": Giữ nguyên.
-4. Nhấp nút **Lưu cài đặt** (Save) và chọn **Khởi động lại ngay** (Restart now) để giả lập áp dụng cấu hình.
+   - Chuyển sang chọn: **"Mở kết nối từ xa"** (Open remote connection).
+   > **Quan trọng**: Trên LDPlayer 9, nếu chọn *"Mở kết nối cục bộ"* (Open local connection), giả lập sẽ chỉ cho phép nội bộ LDPlayer dùng và chặn các lệnh click ngầm từ tool bên ngoài, dẫn tới lỗi *"Lệnh chạm không gửi được"*. Do đó bắt buộc phải chọn **"Mở kết nối từ xa"** (Open remote connection).
+4. Nhấp chọn thẻ **Cơ bản** (Basic):
+   - Tích chọn **Bật quyền Root** (Enable root permission).
+5. Nhấp nút **Lưu cài đặt** (Save settings) và chọn **Khởi động lại ngay** (Restart now).
+6. **Lưu ý phụ**: Nếu LDPlayer có mở cửa sổ quảng cáo/nhận quà trồi ra bên phải (*Sidebar* - ví dụ: *Chiến Thú Hỗn Chiến*), hãy bấm dấu [X] đóng bảng đó lại để không chiếm quyền điều khiển của màn hình game.
 
-### 3. MuMu Player (MuMu 12 & 6)
-1. Mở MuMu Player, nhấp vào biểu tượng **Menu 3 dấu gạch ngang** (hoặc Bánh răng) ở góc trên bên phải -> chọn **Trung tâm cài đặt** (Settings Center).
-2. Nhấp chọn thẻ **Khác** (Other Settings) hoặc **Cơ bản** (Basic Settings).
-3. Tìm mục **Gỡ lỗi ADB** (ADB Debugging):
-   - Nếu chưa tích: Nhấp tích chọn **BẬT** (Turn on ADB).
-   - Nếu đã có dấu tích xanh: Giữ nguyên.
+### 3. MuMu Player (MuMu 12 & MuMu 6)
+1. Mở MuMu Player, nhấp vào biểu tượng **Menu 3 dấu gạch ngang** ở góc trên bên phải -> chọn **Trung tâm cài đặt** (Settings Center).
+2. **Với MuMu Player 12 (phiên bản mới nhất)**:
+   - Chọn thẻ **Khác** (Others) hoặc **Cài đặt chung** (General).
+   - Tìm mục **Cầu gỡ lỗi Android** (ADB Debugging): Tích chọn **BẬT** (Turn on ADB).
+   - Tool tự động nhận diện cổng `16384` của MuMu 12.
+3. **Với MuMu Player 6**:
+   - Chọn thẻ **Cơ bản** (Basic Settings) -> Tích chọn **Bật ADB** (cổng `7555`).
 4. Nhấp nút **Lưu thay đổi** (Save changes) và khởi động lại MuMu Player.
 
 ### 4. NoxPlayer
 1. Mở NoxPlayer, nhấp vào biểu tượng **Bánh răng (Cài đặt hệ thống)** ở thanh tiêu đề góc trên bên phải.
-2. Chọn thẻ **Cài đặt chung** (General Settings) hoặc **Cài đặt điện thoại** (Phone settings).
-3. Tìm mục **Bật gỡ lỗi USB / ADB** (USB debugging / ADB debugging):
-   - Nếu chưa tích: Nhấp tích chọn BẬT.
-   - Nếu đã tích sẵn: Giữ nguyên.
-4. Nhấp nút **Lưu cài đặt** (Save changes) và khởi động lại NoxPlayer.
+2. Chọn thẻ **Cài đặt chung** (General Settings):
+   - Tích chọn **Bật quyền Root** (Root).
+3. Chọn thẻ **Điện thoại & Mạng** (Phone & Network Settings) hoặc **Cài đặt nâng cao**:
+   - Tìm mục **Bật gỡ lỗi USB / ADB** (USB debugging / ADB debugging): Tích chọn **BẬT**.
+4. Nhấp nút **Lưu cài đặt** (Save changes) và khởi động lại NoxPlayer (cổng `62001`).
 
 ### 5. MEmu Play
 1. Mở MEmu Play, nhấp vào biểu tượng **Bánh răng (Cài đặt)** ở thanh công cụ bên phải.
-2. Nhấp chọn thẻ **Nâng cao** (Advanced).
-3. Tìm dòng **Kết nối ADB** (ADB Connection):
-   - Nếu đang tắt: Chuyển sang **BẬT** (Open).
-   - Nếu đã bật sẵn: Giữ nguyên.
-4. Nhấp nút **Lưu** (Save) và khởi động lại MEmu Play.
+2. Nhấp chọn thẻ **Nâng cao** (Advanced):
+   - Tích chọn **Bật Root** (Root mode).
+   - Tìm dòng **Kết nối ADB** (ADB Connection): Chuyển sang **BẬT** (Open).
+3. Nhấp nút **Lưu** (Save) và khởi động lại MEmu Play (cổng `21503`).
 
 ---
 
