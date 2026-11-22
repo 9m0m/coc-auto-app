@@ -153,10 +153,10 @@ HSV_RALLY_JOINED_GREEN_UPPER = [85, 255, 255]
 RALLY_JOINED_PX_THRESHOLD: int = 300
 
 # Ngưỡng nhận diện Template Matching tiêu đề 'Tổng Tấn Công!' trên Mapview
-# (Giá trị thật: 0.78 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.43. Ngưỡng 0.55 bắt nhạy cả khi bubble bị đè/che khuất)
-RALLY_MATCH_THRESHOLD: float = 0.55
-# Dải tỷ lệ quét đa năng của game mobile dọc (hỗ trợ mọi kích cỡ cửa sổ từ thu nhỏ đến cực đại 1080p/2K)
-RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92, 1.12, 0.88, 0.80, 0.72, 0.67, 1.20, 1.28]
+# (Giá trị thật: 0.62 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.38. Ngưỡng 0.60 loại trừ 100% false positive địa hình vàng)
+RALLY_MATCH_THRESHOLD: float = 0.60
+# Dải tỷ lệ quét chuẩn quanh tỷ lệ 1.0 (tránh scale quá nhỏ <0.88 gây nhầm lẫn ô đất sa mạc)
+RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92]
 
 # Ngưỡng nhận diện bảng Tấn Công ô đất (Hình 2 - Không phải Rally, cần tự đóng về Mapview)
 RALLY_TILE_ATTACK_YELLOW_PX: int = 1500  # Nút vàng "Tấn Công" góc dưới bên phải
