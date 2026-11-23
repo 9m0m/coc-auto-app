@@ -179,8 +179,9 @@ class AutoApp(ctk.CTk):
 
         # Thiết lập cửa sổ chính
         self.title("COC AutoMaster")
-        self.geometry("520x690")
-        self.resizable(False, False)
+        self.geometry("520x730")
+        self.minsize(480, 620)
+        self.resizable(True, True)
         
         # Gam màu nền Slate trung tính dịu mắt (#0c1017)
         self.configure(fg_color="#0c1017")
@@ -445,60 +446,35 @@ class AutoApp(ctk.CTk):
         self.lbl_mode_status.pack(pady=(0, 14))
 
     def _build_fishing_options(self):
-        """Khung tùy chọn cơ chế click riêng cho Auto Câu Cá (Chuột siêu tốc vs ADB ngầm)."""
+        """Khung tùy chọn cơ chế click riêng cho Auto Câu Cá (Chiếm chuột vs Click ảo)."""
         self.card_fishing_options = ctk.CTkFrame(
             self,
-            corner_radius=14,
+            corner_radius=12,
             fg_color="#151c28",
             border_width=1,
             border_color="#243044",
         )
 
-        # Tiêu đề card + huy hiệu khuyên dùng
-        top_row = ctk.CTkFrame(self.card_fishing_options, fg_color="transparent")
-        top_row.pack(fill="x", padx=16, pady=(10, 6))
-
-        lbl_title = ctk.CTkLabel(
-            top_row,
-            text="CƠ CHẾ CLICK CÂU CÁ (RIÊNG CÂU CÁ)",
-            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            text_color="#64748b",
-        )
-        lbl_title.pack(side="left")
-
-        self.lbl_fishing_badge = ctk.CTkLabel(
-            top_row,
-            text="Khuyên Dùng: Chuột 0.02s",
-            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color="#0f291e",
-            text_color="#34d399",
-            corner_radius=6,
-            padx=8,
-            pady=2,
-        )
-        self.lbl_fishing_badge.pack(side="right")
-
-        # Nút chuyển đổi cơ chế click
         capsule = ctk.CTkFrame(
             self.card_fishing_options,
-            corner_radius=10,
+            corner_radius=8,
             fg_color="#090d15",
             border_width=1,
             border_color="#1e2738",
         )
-        capsule.pack(fill="x", padx=14, pady=(0, 8))
+        capsule.pack(fill="x", padx=12, pady=(8, 4))
 
         inner_row = ctk.CTkFrame(capsule, fg_color="transparent")
-        inner_row.pack(fill="x", padx=4, pady=4)
+        inner_row.pack(fill="x", padx=3, pady=3)
 
         self.btn_fish_mouse = ctk.CTkButton(
             inner_row,
-            text="🖱️ Chuột Siêu Tốc (0.02s)",
-            height=30,
+            text="Chiếm chuột",
+            height=28,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             fg_color="#0284c7",
             hover_color="#0369a1",
-            corner_radius=7,
+            corner_radius=6,
             text_color="#ffffff",
             command=lambda: self._set_fishing_click_mode("mouse"),
         )
@@ -506,96 +482,50 @@ class AutoApp(ctk.CTk):
 
         self.btn_fish_adb = ctk.CTkButton(
             inner_row,
-            text="⚡ Click Ngầm ADB",
-            height=30,
+            text="Click ảo",
+            height=28,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             fg_color="transparent",
             hover_color="#182030",
-            corner_radius=7,
+            corner_radius=6,
             text_color="#94a3b8",
             command=lambda: self._set_fishing_click_mode("adb"),
         )
         self.btn_fish_adb.pack(side="left", fill="x", expand=True, padx=2)
 
-        # Khung thông tin so sánh Ưu điểm - Bất lợi - Rủi ro & Mô phỏng tay người
-        self.box_fishing_info = ctk.CTkFrame(
+        self.lbl_fishing_note = ctk.CTkLabel(
             self.card_fishing_options,
-            corner_radius=8,
-            fg_color="#0d131f",
-            border_width=1,
-            border_color="#1e293b",
-        )
-        self.box_fishing_info.pack(fill="x", padx=14, pady=(0, 10))
-
-        self.lbl_fish_pro = ctk.CTkLabel(
-            self.box_fishing_info,
-            text="⚡ Ưu điểm: Phản xạ 0.02s cực nhạy, 100% Hoàn Hảo, câu trọn cá hiếm & kỷ lục.",
+            text="⚡ Siêu nhạy 0.02s, 100% Hoàn Hảo (Mô phỏng rung tay ±2px). Tạm giữ chuột khi giật.",
             font=ctk.CTkFont(family="Segoe UI", size=10),
             text_color="#38bdf8",
             anchor="w",
             justify="left",
         )
-        self.lbl_fish_pro.pack(fill="x", padx=10, pady=(6, 2))
-
-        self.lbl_fish_human = ctk.CTkLabel(
-            self.box_fishing_info,
-            text="👤 Mô phỏng tay người: Rung ngẫu nhiên ±2px quanh tâm & giữ chuột 16-26ms chống ban.",
-            font=ctk.CTkFont(family="Segoe UI", size=10),
-            text_color="#34d399",
-            anchor="w",
-            justify="left",
-        )
-        self.lbl_fish_human.pack(fill="x", padx=10, pady=2)
-
-        self.lbl_fish_con = ctk.CTkLabel(
-            self.box_fishing_info,
-            text="⚠️ Rủi ro / Bất lợi: Tạm chiếm con trỏ chuột trong 2-3s kéo cá (không di chuột khi giật).",
-            font=ctk.CTkFont(family="Segoe UI", size=10),
-            text_color="#f59e0b",
-            anchor="w",
-            justify="left",
-        )
-        self.lbl_fish_con.pack(fill="x", padx=10, pady=(2, 6))
+        self.lbl_fishing_note.pack(fill="x", padx=14, pady=(0, 6))
 
     def _set_fishing_click_mode(self, mode: str):
-        """Chuyển đổi giữa 2 cơ chế click câu cá."""
+        """Chuyển đổi giữa 2 cơ chế click câu cá: Chiếm chuột vs Click ảo."""
         if self.is_running:
             return
         self.fishing_click_mode = mode
         if mode == "mouse":
             self.btn_fish_mouse.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
             self.btn_fish_adb.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
-            self.lbl_fishing_badge.configure(text="Khuyên Dùng: Chuột 0.02s", fg_color="#0f291e", text_color="#34d399")
-            self.lbl_fish_pro.configure(
-                text="⚡ Ưu điểm: Phản xạ 0.02s cực nhạy, 100% Hoàn Hảo, câu trọn cá hiếm & kỷ lục.",
+            self.lbl_fishing_note.configure(
+                text="⚡ Siêu nhạy 0.02s, 100% Hoàn Hảo (Mô phỏng rung tay ±2px). Tạm giữ chuột khi giật.",
                 text_color="#38bdf8",
             )
-            self.lbl_fish_human.configure(
-                text="👤 Mô phỏng tay người: Rung ngẫu nhiên ±2px quanh tâm & giữ chuột 16-26ms chống ban.",
-                text_color="#34d399",
-            )
-            self.lbl_fish_con.configure(
-                text="⚠️ Rủi ro / Bất lợi: Tạm chiếm con trỏ chuột trong 2-3s kéo cá (không di chuột khi giật).",
-                text_color="#f59e0b",
-            )
-            self.log("Cơ chế câu cá: Chuột Siêu Tốc (0.02s - Mô phỏng người)")
+            self.lbl_mode_status.configure(text="● Auto Câu Cá (Chiếm chuột)")
+            self.log("Cơ chế câu cá: Chiếm chuột (0.02s - Mô phỏng người)")
         else:
             self.btn_fish_mouse.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
             self.btn_fish_adb.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
-            self.lbl_fishing_badge.configure(text="Rảnh Tay: Click ADB", fg_color="#1e293b", text_color="#94a3b8")
-            self.lbl_fish_pro.configure(
-                text="🛡️ Ưu điểm: Hoàn toàn không chiếm chuột, người dùng tự do lướt web / gõ phím.",
-                text_color="#38bdf8",
+            self.lbl_fishing_note.configure(
+                text="🛡️ Chạy ngầm ADB, rảnh tay làm việc. (Trễ ~300ms, dễ hụt cá hiếm).",
+                text_color="#94a3b8",
             )
-            self.lbl_fish_human.configure(
-                text="👤 Mô phỏng tay người: Tự động tạo độ lệch tọa độ ±2px trên Android.",
-                text_color="#34d399",
-            )
-            self.lbl_fish_con.configure(
-                text="⚠️ Rủi ro / Bất lợi: Độ trễ ADB ~300ms, dễ hụt các con cá hiếm có thanh trượt hẹp.",
-                text_color="#ef4444",
-            )
-            self.log("Cơ chế câu cá: Click Ngầm ADB (Không chiếm chuột)")
+            self.lbl_mode_status.configure(text="● Auto Câu Cá (Click ảo)")
+            self.log("Cơ chế câu cá: Click ảo (ADB ngầm - Không chiếm chuột)")
 
     def _select_mode(self, mode: str):
         """Xử lý đổi chế độ với tên gọi ngắn gọn, không dài dòng."""
@@ -628,11 +558,11 @@ class AutoApp(ctk.CTk):
             self.log("Chuyển chế độ: Auto Rally")
         elif mode == "fishing":
             self.btn_mode_fishing.configure(**active_cfg)
-            mode_desc = "Chuột Siêu Tốc" if self.fishing_click_mode == "mouse" else "ADB Ngầm"
+            mode_desc = "Chiếm chuột" if self.fishing_click_mode == "mouse" else "Click ảo"
             self.lbl_mode_status.configure(text=f"● Auto Câu Cá ({mode_desc})")
             if self.card_fishing_options:
-                self.card_fishing_options.pack(fill="x", padx=24, pady=6, after=self.card_mode)
-            self.log(f"Chuyển chế độ: Auto Câu Cá (Cơ chế: {mode_desc})")
+                self.card_fishing_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
+            self.log(f"Chuyển chế độ: Auto Câu Cá ({mode_desc})")
         elif mode == "adventure":
             self.btn_mode_adventure.configure(**active_cfg)
             self.lbl_mode_status.configure(text="● Auto Phiêu Lưu")

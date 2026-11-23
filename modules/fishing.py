@@ -240,7 +240,7 @@ def run_fishing_loop(
     - click_mode == 'mouse': Win32 mouse_event siêu tốc 0.02s mô phỏng tay người (Khuyên dùng, nhạy 100%).
     - click_mode == 'adb': ADB Tap ngầm (Không chiếm chuột).
     """
-    mode_name = "Chuột Siêu Tốc 0.02s (Mô phỏng người)" if click_mode == "mouse" else "ADB Ngầm (Không chiếm chuột)"
+    mode_name = "Chiếm chuột (0.02s)" if click_mode == "mouse" else "Click ảo (ADB ngầm)"
     log_cb(f"Khởi động Auto Câu Cá (Cơ chế: {mode_name})...")
     sct = mss.mss()
 
