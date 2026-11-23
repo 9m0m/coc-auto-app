@@ -141,6 +141,131 @@ def analyze_button_colors(btn_bgr: np.ndarray) -> Tuple[int, int, int]:
     return green_px, grey_px, purple_px
 
 
+def detect_fishing_button(
+    scan_bgr: np.ndarray,
+    scan_left: int,
+    scan_top: int,
+    ref_rel: Optional[Tuple[Optional[float], Optional[float]]] = None,
+    gw_vp: Optional[Tuple[int, int, int, int]] = None,
+) -> Optional[Tuple[int, int, str, int]]:
+    """
+    Quét dải đáy màn hình để tìm nút câu cá hình tròn thích ứng (Smart Adaptive Button).
+    Tự động nhận diện tâm nút câu qua 3 trạng thái màu:
+    - Tím (Cá cắn / Giật cần)
+    - Xanh lá (Sẵn sàng quăng cần)
+    - Xám (Cần dưới nước đang chờ cá)
+
+    Hỗ trợ cả BlueStacks, LDPlayer, Nox, MuMu mà không cần fix cứng toạ độ.
+    Trả về: (screen_x, screen_y, color_type, contour_area) nếu tìm thấy, ngược lại None.
+    """
+    if scan_bgr is None or scan_bgr.size == 0:
+        return None
+
+    try:
+        hsv = cv2.cvtColor(scan_bgr, cv2.COLOR_BGR2HSV)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        sh, sw = scan_bgr.shape[:2]
+
+        ref_x, ref_y = None, None
+        if ref_rel and ref_rel[0] is not None and ref_rel[1] is not None and gw_vp:
+            gw_l, gw_t, gw_w, gw_h = gw_vp
+            ref_x = int(gw_l + gw_w * ref_rel[0])
+            ref_y = int(gw_t + gw_h * ref_rel[1])
+
+        # 1. Quét màu Tím (Ưu tiên cao nhất khi cá cắn câu)
+        purple_mask = cv2.inRange(
+            hsv,
+            np.array(config.HSV_BITE_PURPLE_LOWER, dtype=np.uint8),
+            np.array(config.HSV_BITE_PURPLE_UPPER, dtype=np.uint8),
+        )
+        if np.count_nonzero(purple_mask) > 150:
+            clean_p = cv2.morphologyEx(purple_mask, cv2.MORPH_CLOSE, kernel)
+            contours, _ = cv2.findContours(clean_p, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            p_candidates = []
+            for c in contours:
+                area = cv2.contourArea(c)
+                if area >= 150:
+                    x, y, bw, bh = cv2.boundingRect(c)
+                    aspect_ratio = float(bw) / float(bh) if bh > 0 else 0
+                    if 0.65 <= aspect_ratio <= 1.50 and bw >= 22 and bh >= 22 and bw <= sw * 0.9 and bh <= sh * 0.9:
+                        M = cv2.moments(c)
+                        cx = int(M["m10"] / M["m00"]) if M["m00"] > 0 else x + bw // 2
+                        cy = int(M["m01"] / M["m00"]) if M["m00"] > 0 else y + bh // 2
+                        p_candidates.append((area, cx, cy))
+            if p_candidates:
+                if ref_x is not None and ref_y is not None:
+                    p_candidates.sort(key=lambda item: ((scan_left + item[1] - ref_x) ** 2 + (scan_top + item[2] - ref_y) ** 2))
+                else:
+                    p_candidates.sort(key=lambda item: item[0], reverse=True)
+                area, cx, cy = p_candidates[0]
+                return scan_left + cx, scan_top + cy, "purple", int(area)
+
+        # 2. Quét màu Xanh lá (Nút sẵn sàng quăng cần trên bờ)
+        green_mask = cv2.inRange(
+            hsv,
+            np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
+            np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
+        )
+        if np.count_nonzero(green_mask) > 150:
+            clean_g = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
+            contours, _ = cv2.findContours(clean_g, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            g_candidates = []
+            for c in contours:
+                area = cv2.contourArea(c)
+                if area >= 150:
+                    x, y, bw, bh = cv2.boundingRect(c)
+                    aspect_ratio = float(bw) / float(bh) if bh > 0 else 0
+                    if 0.65 <= aspect_ratio <= 1.50 and bw >= 22 and bh >= 22 and bw <= sw * 0.9 and bh <= sh * 0.9:
+                        M = cv2.moments(c)
+                        cx = int(M["m10"] / M["m00"]) if M["m00"] > 0 else x + bw // 2
+                        cy = int(M["m01"] / M["m00"]) if M["m00"] > 0 else y + bh // 2
+                        g_candidates.append((area, cx, cy))
+            if g_candidates:
+                if ref_x is not None and ref_y is not None:
+                    g_candidates.sort(key=lambda item: ((scan_left + item[1] - ref_x) ** 2 + (scan_top + item[2] - ref_y) ** 2))
+                else:
+                    g_candidates.sort(key=lambda item: item[0], reverse=True)
+                area, cx, cy = g_candidates[0]
+                return scan_left + cx, scan_top + cy, "green", int(area)
+
+        # 3. Quét màu Xám (Cần đã thả xuống nước, đang chờ cá cắn)
+        s_channel = hsv[:, :, 1]
+        v_channel = hsv[:, :, 2]
+        grey_mask = (
+            (s_channel < config.GREY_SATURATION_MAX)
+            & (v_channel >= config.GREY_VALUE_MIN)
+            & (v_channel <= config.GREY_VALUE_MAX)
+        ).astype(np.uint8) * 255
+
+        if np.count_nonzero(grey_mask) > 250:
+            clean_grey = cv2.morphologyEx(grey_mask, cv2.MORPH_CLOSE, kernel)
+            contours, _ = cv2.findContours(clean_grey, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            grey_candidates = []
+            for c in contours:
+                area = cv2.contourArea(c)
+                if area >= 250:
+                    x, y, bw, bh = cv2.boundingRect(c)
+                    aspect_ratio = float(bw) / float(bh) if bh > 0 else 0
+                    fill_ratio = area / float(bw * bh) if (bw * bh) > 0 else 0
+                    if 0.65 <= aspect_ratio <= 1.50 and bw >= 24 and bh >= 24 and bw <= sw * 0.9 and bh <= sh * 0.9 and fill_ratio >= 0.35:
+                        M = cv2.moments(c)
+                        cx = int(M["m10"] / M["m00"]) if M["m00"] > 0 else x + bw // 2
+                        cy = int(M["m01"] / M["m00"]) if M["m00"] > 0 else y + bh // 2
+                        grey_candidates.append((area, cx, cy))
+            if grey_candidates:
+                if ref_x is not None and ref_y is not None:
+                    grey_candidates.sort(key=lambda item: ((scan_left + item[1] - ref_x) ** 2 + (scan_top + item[2] - ref_y) ** 2))
+                else:
+                    grey_candidates.sort(key=lambda item: item[0], reverse=True)
+                area, cx, cy = grey_candidates[0]
+                return scan_left + cx, scan_top + cy, "grey", int(area)
+
+    except Exception:
+        pass
+
+    return None
+
+
 def detect_yellow_and_bobber(roi_img: np.ndarray) -> Tuple[Optional[Tuple[int, int]], Optional[int]]:
     """
     Quét ô vàng mục tiêu và phao đỏ trên thanh trượt mini-game bằng contour & morphology.
@@ -251,6 +376,8 @@ def run_fishing_loop(
     no_rod_start = 0.0
     last_claim_check_waiting = 0.0
     fish_count = 0
+    adaptive_btn_rel_x: Optional[float] = None
+    adaptive_btn_rel_y: Optional[float] = None
 
     while not stop_event.is_set():
         vp = get_vp_func()
@@ -261,9 +388,12 @@ def run_fishing_loop(
 
         gw_l, gw_t, gw_w, gw_h = vp
 
-        # Tính toán tọa độ và vùng quét theo tỉ lệ chuẩn config
-        btn_screen_x = int(gw_l + gw_w * config.BUTTON_REL_X)
-        btn_screen_y = int(gw_t + gw_h * config.BUTTON_REL_Y)
+        # Tọa độ nút câu thích ứng (Tự động thích nghi giữa BlueStacks, LDPlayer, Nox, MuMu)
+        cur_btn_rel_x = adaptive_btn_rel_x if adaptive_btn_rel_x is not None else config.BUTTON_REL_X
+        cur_btn_rel_y = adaptive_btn_rel_y if adaptive_btn_rel_y is not None else config.BUTTON_REL_Y
+
+        btn_screen_x = int(gw_l + gw_w * cur_btn_rel_x)
+        btn_screen_y = int(gw_t + gw_h * cur_btn_rel_y)
         claim_screen_x = int(gw_l + gw_w * config.CLAIM_REL_X)
         claim_screen_y = int(gw_t + gw_h * config.CLAIM_REL_Y)
         card_screen_x = int(gw_l + gw_w * config.CARD_REL_X)
@@ -274,6 +404,13 @@ def run_fishing_loop(
             "left": btn_screen_x - 30,
             "width": 60,
             "height": 60,
+        }
+
+        scan_box = {
+            "left": int(gw_l + gw_w * config.BUTTON_SCAN_REL_X_MIN),
+            "top": int(gw_t + gw_h * config.BUTTON_SCAN_REL_Y_MIN),
+            "width": max(1, int(gw_w * (config.BUTTON_SCAN_REL_X_MAX - config.BUTTON_SCAN_REL_X_MIN))),
+            "height": max(1, int(gw_h * (config.BUTTON_SCAN_REL_Y_MAX - config.BUTTON_SCAN_REL_Y_MIN))),
         }
 
         slider_box = {
@@ -310,7 +447,48 @@ def run_fishing_loop(
                     state = "CLAIM_REWARD"
                     continue
 
-            bgr = safe_grab(sct, btn_box)
+            # 2. Tự động thích ứng vị trí nút câu cá qua dải quét đáy màn hình
+            scan_bgr = safe_grab(sct, scan_box)
+            bgr = None
+            if scan_bgr is not None:
+                det = detect_fishing_button(
+                    scan_bgr,
+                    scan_box["left"],
+                    scan_box["top"],
+                    ref_rel=(adaptive_btn_rel_x, adaptive_btn_rel_y),
+                    gw_vp=vp,
+                )
+                if det is not None:
+                    det_x, det_y, det_col, det_area = det
+                    det_rel_x = (det_x - gw_l) / float(gw_w)
+                    det_rel_y = (det_y - gw_t) / float(gw_h)
+                    if (
+                        adaptive_btn_rel_x is None
+                        or abs(det_rel_x - adaptive_btn_rel_x) > 0.015
+                        or abs(det_rel_y - adaptive_btn_rel_y) > 0.015
+                    ):
+                        adaptive_btn_rel_x = det_rel_x
+                        adaptive_btn_rel_y = det_rel_y
+                        log_cb(f"[Thích ứng] Khóa tâm nút câu: Rel X = {adaptive_btn_rel_x:.3f}, Rel Y = {adaptive_btn_rel_y:.3f} ({det_col})")
+                    btn_screen_x = det_x
+                    btn_screen_y = det_y
+                    btn_box["left"] = btn_screen_x - 30
+                    btn_box["top"] = btn_screen_y - 30
+
+                    # Cắt nhanh btn_bgr từ scan_bgr đã có trong RAM (tiết kiệm thời gian chụp màn hình)
+                    rel_l = btn_screen_x - 30 - scan_box["left"]
+                    rel_t = btn_screen_y - 30 - scan_box["top"]
+                    if (
+                        0 <= rel_l
+                        and 0 <= rel_t
+                        and (rel_l + 60) <= scan_box["width"]
+                        and (rel_t + 60) <= scan_box["height"]
+                    ):
+                        bgr = scan_bgr[rel_t : rel_t + 60, rel_l : rel_l + 60]
+
+            if bgr is None:
+                bgr = safe_grab(sct, btn_box)
+
             if bgr is None:
                 if _sleep_check(0.5, stop_event):
                     break
@@ -383,7 +561,47 @@ def run_fishing_loop(
                         state = "CLAIM_REWARD"
                         continue
 
-            bgr = safe_grab(sct, btn_box)
+            # 2. Tự động thích ứng vị trí nút câu cá trong dải đáy màn hình
+            scan_bgr = safe_grab(sct, scan_box)
+            bgr = None
+            if scan_bgr is not None:
+                det = detect_fishing_button(
+                    scan_bgr,
+                    scan_box["left"],
+                    scan_box["top"],
+                    ref_rel=(adaptive_btn_rel_x, adaptive_btn_rel_y),
+                    gw_vp=vp,
+                )
+                if det is not None:
+                    det_x, det_y, det_col, det_area = det
+                    det_rel_x = (det_x - gw_l) / float(gw_w)
+                    det_rel_y = (det_y - gw_t) / float(gw_h)
+                    if (
+                        adaptive_btn_rel_x is None
+                        or abs(det_rel_x - adaptive_btn_rel_x) > 0.015
+                        or abs(det_rel_y - adaptive_btn_rel_y) > 0.015
+                    ):
+                        adaptive_btn_rel_x = det_rel_x
+                        adaptive_btn_rel_y = det_rel_y
+                        log_cb(f"[Thích ứng] Khóa tâm nút câu khi chờ: Rel X = {adaptive_btn_rel_x:.3f}, Rel Y = {adaptive_btn_rel_y:.3f} ({det_col})")
+                    btn_screen_x = det_x
+                    btn_screen_y = det_y
+                    btn_box["left"] = btn_screen_x - 30
+                    btn_box["top"] = btn_screen_y - 30
+
+                    rel_l = btn_screen_x - 30 - scan_box["left"]
+                    rel_t = btn_screen_y - 30 - scan_box["top"]
+                    if (
+                        0 <= rel_l
+                        and 0 <= rel_t
+                        and (rel_l + 60) <= scan_box["width"]
+                        and (rel_t + 60) <= scan_box["height"]
+                    ):
+                        bgr = scan_bgr[rel_t : rel_t + 60, rel_l : rel_l + 60]
+
+            if bgr is None:
+                bgr = safe_grab(sct, btn_box)
+
             if bgr is None:
                 if _sleep_check(0.5, stop_event):
                     break
