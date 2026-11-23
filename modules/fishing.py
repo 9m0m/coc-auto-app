@@ -7,6 +7,8 @@ Thay thế toàn bộ click chuột Win32 bằng ADB Tap ngầm (Không chiếm 
 
 import time
 import threading
+import ctypes
+import random
 from typing import Optional, Tuple, Callable
 
 import cv2
@@ -18,6 +20,8 @@ from core.viewport import screen_to_android
 from core.vision import safe_grab
 from core.adb_manager import ADBManager
 
+user32 = ctypes.windll.user32 if hasattr(ctypes, "windll") else None
+
 
 def _sleep_check(seconds: float, stop_event: threading.Event) -> bool:
     """Nghỉ có thể ngắt ngay lập tức khi stop_event được bật."""
@@ -27,6 +31,48 @@ def _sleep_check(seconds: float, stop_event: threading.Event) -> bool:
             return True
         time.sleep(0.015)
     return False
+
+
+def _mouse_fast_tap(x: int, y: int, jitter: bool = True) -> None:
+    """Bấm siêu tốc phản xạ mili-giây qua Win32 mouse_event mô phỏng tay người (±2px, 16-26ms)."""
+    if not user32:
+        return
+    click_x = int(x)
+    click_y = int(y)
+    hold_time = 0.020
+    if jitter:
+        click_x += random.randint(-2, 2)
+        click_y += random.randint(-2, 2)
+        hold_time = random.uniform(0.016, 0.026)
+    user32.SetCursorPos(click_x, click_y)
+    user32.mouse_event(0x0002, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
+    time.sleep(hold_time)
+    user32.mouse_event(0x0004, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
+
+
+def _mouse_touch_tap(
+    x: int,
+    y: int,
+    desc: str = "",
+    log_cb: Optional[Callable[[str], None]] = None,
+    jitter: bool = True,
+) -> None:
+    """Chạm cảm ứng Win32 mô phỏng tay người giữ 55-75ms, độ lệch ±2px."""
+    if not user32:
+        return
+    if desc and log_cb:
+        log_cb(f"-> [Chuột] {desc} ({x}, {y})")
+    click_x = int(x)
+    click_y = int(y)
+    hold_time = 0.065
+    if jitter:
+        click_x += random.randint(-2, 2)
+        click_y += random.randint(-2, 2)
+        hold_time = random.uniform(0.055, 0.075)
+    user32.SetCursorPos(click_x, click_y)
+    user32.mouse_event(0x0002, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
+    time.sleep(hold_time)
+    user32.mouse_event(0x0004, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
 
 
 def _adb_tap(
@@ -43,8 +89,28 @@ def _adb_tap(
     screen_sz = adb.screen_size or (720, 1280)
     ax, ay = screen_to_android(win_x, win_y, vp, screen_sz)
     if desc and log_cb:
-        log_cb(f"-> {desc} (Android: {ax}, {ay})")
+        log_cb(f"-> [ADB] {desc} (Android: {ax}, {ay})")
     adb.tap(ax, ay)
+
+
+def _perform_tap(
+    click_mode: str,
+    adb: ADBManager,
+    vp: Tuple[int, int, int, int],
+    screen_x: int,
+    screen_y: int,
+    desc: str = "",
+    log_cb: Optional[Callable[[str], None]] = None,
+    is_fast: bool = False,
+) -> None:
+    """Điều phối tap dựa theo click_mode: 'mouse' (Chuột siêu tốc) hoặc 'adb' (ADB ngầm)."""
+    if click_mode == "mouse":
+        if is_fast:
+            _mouse_fast_tap(screen_x, screen_y, jitter=True)
+        else:
+            _mouse_touch_tap(screen_x, screen_y, desc=desc, log_cb=log_cb, jitter=True)
+    else:
+        _adb_tap(adb, vp, screen_x, screen_y, desc=desc, log_cb=log_cb)
 
 
 def analyze_button_colors(btn_bgr: np.ndarray) -> Tuple[int, int, int]:
@@ -166,11 +232,16 @@ def run_fishing_loop(
     get_vp_func: Callable[[], Optional[Tuple[int, int, int, int]]],
     stop_event: threading.Event,
     log_cb: Callable[[str], None],
+    click_mode: str = "mouse",
 ):
     """
     Vòng lặp chạy chính của Auto Câu Cá (FSM 4 bước + 2 Pha Minigame chuẩn 100%).
+    Hỗ trợ 2 cơ chế click độc lập:
+    - click_mode == 'mouse': Win32 mouse_event siêu tốc 0.02s mô phỏng tay người (Khuyên dùng, nhạy 100%).
+    - click_mode == 'adb': ADB Tap ngầm (Không chiếm chuột).
     """
-    log_cb("Khởi động Auto Câu Cá (Hybrid ADB)...")
+    mode_name = "Chuột Siêu Tốc 0.02s (Mô phỏng người)" if click_mode == "mouse" else "ADB Ngầm (Không chiếm chuột)"
+    log_cb(f"Khởi động Auto Câu Cá (Cơ chế: {mode_name})...")
     sct = mss.mss()
 
     state = "READY_TO_CAST"
@@ -249,7 +320,7 @@ def run_fishing_loop(
 
             if purple_px > config.PURPLE_PX_THRESHOLD:
                 log_cb(f"[Phục hồi] Cá đang cắn ({purple_px}px tím) -> GIẬT CẦN!")
-                _adb_tap(adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb)
+                _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb, is_fast=True)
                 if _sleep_check(0.35, stop_event):
                     break
                 state = "MINIGAME_SLIDER"
@@ -267,7 +338,7 @@ def run_fishing_loop(
 
             if green_px > config.GREEN_PX_THRESHOLD:
                 log_cb(f"[1/4] Thả cần ({green_px}px xanh)...")
-                _adb_tap(adb, vp, btn_screen_x, btn_screen_y, "Nút quăng cần", log_cb)
+                _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Nút quăng cần", log_cb)
                 if _sleep_check(1.5, stop_event):
                     break
                 state = "WAITING_BITE"
@@ -283,9 +354,9 @@ def run_fishing_loop(
 
             if now - wait_ready_start > 2.5:
                 log_cb("[Giải phóng] Chạm giải phóng thẻ bài / popup tồn dư...")
-                _adb_tap(adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ bài")
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ bài", log_cb)
                 time.sleep(0.3)
-                _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay")
+                _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay", log_cb)
                 if _sleep_check(0.8, stop_event):
                     break
                 wait_ready_start = time.time()
@@ -333,7 +404,7 @@ def run_fishing_loop(
             # Phát hiện cá cắn
             if purple_px > config.PURPLE_PX_THRESHOLD:
                 log_cb(f"[2/4] CÁ CẮN! ({purple_px}px tím) -> GIẬT CẦN!")
-                _adb_tap(adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb)
+                _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb, is_fast=True)
                 if _sleep_check(0.35, stop_event):
                     break
                 state = "MINIGAME_SLIDER"
@@ -346,9 +417,9 @@ def run_fishing_loop(
                     no_rod_start = now
                 elif now - no_rod_start > 3.0:
                     log_cb("[Giải phóng] Mất cần > 3s -> Tự giải thoát popup...")
-                    _adb_tap(adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ")
+                    _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ", log_cb)
                     time.sleep(0.3)
-                    _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay")
+                    _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay", log_cb)
                     state = "READY_TO_CAST"
                     wait_ready_start = time.time()
                     no_rod_start = 0.0
@@ -361,9 +432,9 @@ def run_fishing_loop(
             # Timeout an toàn > 18s
             if now - bite_wait_start > 18.0:
                 log_cb("[Timeout] Chờ cá cắn > 18s -> Tự giải phóng và thả lại...")
-                _adb_tap(adb, vp, card_screen_x, card_screen_y, "Đóng thẻ tồn dư")
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Đóng thẻ tồn dư", log_cb)
                 time.sleep(0.3)
-                _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay tồn dư")
+                _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay tồn dư", log_cb)
                 state = "READY_TO_CAST"
                 wait_ready_start = time.time()
                 no_rod_start = 0.0
@@ -489,7 +560,7 @@ def run_fishing_loop(
                             crossed = False
 
                         if inside or crossed:
-                            _adb_tap(adb, vp, btn_screen_x, btn_screen_y)
+                            _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, is_fast=True)
                             hit_count += 1
                             last_hit_time = cur_t
                             log_cb(f"  -> [Hoàn Hảo #{hit_count}] Phao ({bobber_x}) trúng ô vàng [{l_start}, {l_end}] (Rộng: {y_width}px)")
@@ -512,12 +583,12 @@ def run_fishing_loop(
                 break
 
             # Nhịp 1: Chạm trực tiếp tâm thẻ (Rel Y = 0.480) để đóng thẻ Kỷ Lục Mới / Cá Mới
-            _adb_tap(adb, vp, card_screen_x, card_screen_y, "Đóng thẻ kỷ lục (Nhịp 1)", log_cb)
+            _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Đóng thẻ kỷ lục (Nhịp 1)", log_cb)
             if _sleep_check(0.35, stop_event):
                 break
 
             # Nhịp 2: Chạm nút "Nhận Ngay" (Rel Y = 0.870) của màn hình cá thường
-            _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay (Nhịp 2)", log_cb)
+            _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay (Nhịp 2)", log_cb)
             if _sleep_check(0.35, stop_event):
                 break
 
@@ -533,7 +604,7 @@ def run_fishing_loop(
                     )
                     if np.count_nonzero(c_green) > 300:
                         log_cb(f"  -> Popup vẫn còn ({np.count_nonzero(c_green)}px xanh), bấm tiếp lần {retry + 1}...")
-                        _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay bổ sung", log_cb)
+                        _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay bổ sung", log_cb)
                         if _sleep_check(0.35, stop_event):
                             break
                     else:
