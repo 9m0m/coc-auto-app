@@ -225,6 +225,20 @@ def run_fishing_loop(
         # BƯỚC 1: CHUẨN BỊ QUĂNG CẦN (READY_TO_CAST)
         # =========================================================
         if state == "READY_TO_CAST":
+            # 1. Ưu tiên kiểm tra và giải phóng nút "Nhận Ngay" trước
+            claim_bgr = safe_grab(sct, claim_box)
+            if claim_bgr is not None:
+                c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
+                c_green = cv2.inRange(
+                    c_hsv,
+                    np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
+                    np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
+                )
+                if np.count_nonzero(c_green) > 300:
+                    log_cb("[Phục hồi] Phát hiện nút Nhận Ngay -> Nhận thưởng!")
+                    state = "CLAIM_REWARD"
+                    continue
+
             bgr = safe_grab(sct, btn_box)
             if bgr is None:
                 if _sleep_check(0.5, stop_event):
@@ -233,7 +247,6 @@ def run_fishing_loop(
 
             green_px, grey_px, purple_px = analyze_button_colors(bgr)
 
-            # 1. Phát hiện cá cắn dở dang -> Giật cần ngay
             if purple_px > config.PURPLE_PX_THRESHOLD:
                 log_cb(f"[Phục hồi] Cá đang cắn ({purple_px}px tím) -> GIẬT CẦN!")
                 _adb_tap(adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb)
@@ -243,7 +256,6 @@ def run_fishing_loop(
                 log_cb("[3/4] Quét thanh trượt...")
                 continue
 
-            # 2. Phát hiện cần đang dưới nước -> Tiếp tục chờ cá cắn
             if grey_px > config.GREY_PX_THRESHOLD:
                 log_cb(f"[Phục hồi] Cần dưới nước ({grey_px}px xám) -> Chờ cá cắn...")
                 state = "WAITING_BITE"
@@ -253,7 +265,6 @@ def run_fishing_loop(
                 last_heartbeat = now
                 continue
 
-            # 3. Nút câu cá sẵn sàng trên bờ -> THẢ CẦN NGAY
             if green_px > config.GREEN_PX_THRESHOLD:
                 log_cb(f"[1/4] Thả cần ({green_px}px xanh)...")
                 _adb_tap(adb, vp, btn_screen_x, btn_screen_y, "Nút quăng cần", log_cb)
@@ -270,9 +281,8 @@ def run_fishing_loop(
                 log_cb(f"[Chờ] Xanh: {green_px} | Xám: {grey_px} | Tím: {purple_px}")
                 last_heartbeat = now
 
-            # 4. Nếu mất nút câu > 2.5s (bị che bởi thẻ bài kỷ lục hoặc popup tàn dư) -> Chạm giải phóng
             if now - wait_ready_start > 2.5:
-                log_cb("[Giải phóng] Không thấy nút câu cá -> Chạm giải phóng popup tàn dư...")
+                log_cb("[Giải phóng] Chạm giải phóng thẻ bài / popup tồn dư...")
                 _adb_tap(adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ bài")
                 time.sleep(0.3)
                 _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay")
@@ -287,6 +297,21 @@ def run_fishing_loop(
         # BƯỚC 2: CHỜ CÁ CẮN CÂU (WAITING_BITE)
         # =========================================================
         elif state == "WAITING_BITE":
+            if now - last_claim_check_waiting > 0.35:
+                last_claim_check_waiting = now
+                claim_bgr = safe_grab(sct, claim_box)
+                if claim_bgr is not None:
+                    c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
+                    c_green = cv2.inRange(
+                        c_hsv,
+                        np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
+                        np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
+                    )
+                    if np.count_nonzero(c_green) > 300:
+                        log_cb(f"[Phục hồi] Nút Nhận Ngay xuất hiện khi đang chờ -> Nhận thưởng!")
+                        state = "CLAIM_REWARD"
+                        continue
+
             bgr = safe_grab(sct, btn_box)
             if bgr is None:
                 if _sleep_check(0.5, stop_event):
@@ -295,7 +320,6 @@ def run_fishing_loop(
 
             green_px, grey_px, purple_px = analyze_button_colors(bgr)
 
-            # Cần câu đã thu về bờ (xanh lá) -> Thả cần lại
             if green_px > config.GREEN_PX_THRESHOLD and grey_px < 300:
                 log_cb(f"[Phục hồi] Cần trên bờ ({green_px}px xanh) -> Thả cần lại!")
                 state = "READY_TO_CAST"
@@ -497,10 +521,23 @@ def run_fishing_loop(
             if _sleep_check(0.35, stop_event):
                 break
 
-            # Nhịp 3: Chạm thêm một nhịp dứt điểm để đảm bảo đóng hẳn mọi popup
-            if _sleep_check(0.35, stop_event):
-                break
-            _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay dứt điểm", log_cb)
+            # Nhịp 3: Xác nhận đóng - nếu nút Nhận Ngay vẫn còn thì bấm tiếp tối đa 3 lần
+            for retry in range(3):
+                claim_bgr = safe_grab(sct, claim_box)
+                if claim_bgr is not None:
+                    c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
+                    c_green = cv2.inRange(
+                        c_hsv,
+                        np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
+                        np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
+                    )
+                    if np.count_nonzero(c_green) > 300:
+                        log_cb(f"  -> Popup vẫn còn ({np.count_nonzero(c_green)}px xanh), bấm tiếp lần {retry + 1}...")
+                        _adb_tap(adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay bổ sung", log_cb)
+                        if _sleep_check(0.35, stop_event):
+                            break
+                    else:
+                        break
 
             fish_count += 1
             log_cb(f"[4/4] Nhận thưởng thành công! Tổng số cá: {fish_count}")
