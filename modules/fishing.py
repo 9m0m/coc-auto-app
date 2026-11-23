@@ -402,6 +402,7 @@ def run_fishing_loop(
         claim_screen_y = int(gw_t + gw_h * config.CLAIM_REL_Y)
         card_screen_x = int(gw_l + gw_w * config.CARD_REL_X)
         card_screen_y = int(gw_t + gw_h * config.CARD_REL_Y)
+        card_confirm_y = int(gw_t + gw_h * config.CARD_CONFIRM_REL_Y)
 
         btn_radius = 55
         btn_box = {
@@ -541,12 +542,14 @@ def run_fishing_loop(
                 log_cb(f"[Chờ] Xanh: {green_px} | Xám: {grey_px} | Tím: {purple_px}")
                 last_heartbeat = now
 
-            if now - wait_ready_start > 2.5:
+            if now - wait_ready_start > 1.5:
                 log_cb("[Giải phóng] Chạm giải phóng thẻ bài / popup tồn dư...")
                 _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ bài", log_cb)
-                time.sleep(0.3)
+                time.sleep(0.2)
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_confirm_y, "Giải phóng xác nhận giữa", log_cb)
+                time.sleep(0.2)
                 _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay", log_cb)
-                if _sleep_check(0.8, stop_event):
+                if _sleep_check(0.5, stop_event):
                     break
                 wait_ready_start = time.time()
             else:
@@ -645,19 +648,21 @@ def run_fishing_loop(
                 log_cb(f"[2/4] Đang chờ cá cắn... Xám: {grey_px} | Tím: {purple_px}")
                 last_heartbeat = now
 
-            # Bất thường: Không có cần dưới nước > 3s (chỉ kích hoạt khi chắc chắn không có cá cắn)
+            # Bất thường: Không có cần dưới nước > 2.5s (chỉ kích hoạt khi chắc chắn không có cá cắn)
             if not is_bite and grey_px < 100 and purple_px < 100 and det_col != "grey":
                 if no_rod_start == 0.0:
                     no_rod_start = now
-                elif now - no_rod_start > 3.0:
-                    log_cb("[Giải phóng] Mất cần > 3s -> Tự giải thoát popup...")
+                elif now - no_rod_start > 2.5:
+                    log_cb("[Giải phóng] Mất cần > 2.5s -> Tự giải thoát popup...")
                     _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Giải phóng thẻ", log_cb)
-                    time.sleep(0.3)
+                    time.sleep(0.2)
+                    _perform_tap(click_mode, adb, vp, card_screen_x, card_confirm_y, "Giải phóng xác nhận giữa", log_cb)
+                    time.sleep(0.2)
                     _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Giải phóng Nhận Ngay", log_cb)
                     state = "READY_TO_CAST"
                     wait_ready_start = time.time()
                     no_rod_start = 0.0
-                    if _sleep_check(0.8, stop_event):
+                    if _sleep_check(0.5, stop_event):
                         break
                     continue
             else:
@@ -667,12 +672,14 @@ def run_fishing_loop(
             if now - bite_wait_start > 18.0:
                 log_cb("[Timeout] Chờ cá cắn > 18s -> Tự giải phóng và thả lại...")
                 _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Đóng thẻ tồn dư", log_cb)
-                time.sleep(0.3)
+                time.sleep(0.2)
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_confirm_y, "Xác nhận giữa tồn dư", log_cb)
+                time.sleep(0.2)
                 _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay tồn dư", log_cb)
                 state = "READY_TO_CAST"
                 wait_ready_start = time.time()
                 no_rod_start = 0.0
-                if _sleep_check(0.8, stop_event):
+                if _sleep_check(0.5, stop_event):
                     break
                 continue
 
@@ -698,9 +705,8 @@ def run_fishing_loop(
                 cur_t = time.time()
 
                 if cur_t - minigame_start > config.MINIGAME_MAX_DURATION:
-                    log_cb(f"[Timeout] Minigame > {config.MINIGAME_MAX_DURATION}s -> Reset...")
-                    state = "READY_TO_CAST"
-                    wait_ready_start = time.time()
+                    log_cb(f"[Timeout] Minigame > {config.MINIGAME_MAX_DURATION}s -> Thu cần và nhận thưởng...")
+                    state = "CLAIM_REWARD"
                     break
 
                 s_bgr = safe_grab(sct, slider_box)
@@ -710,24 +716,25 @@ def run_fishing_loop(
 
                 yellow_range, bobber_x = detect_yellow_and_bobber(s_bgr)
 
-                # Cập nhật thời gian nhìn thấy phao đỏ & kiểm tra nút Nhận Ngay nếu mất phao
+                # Cập nhật thời gian nhìn thấy phao đỏ
                 if bobber_x is not None:
                     last_bobber_seen = cur_t
-                else:
-                    if cur_t - last_claim_check > 0.12:
-                        last_claim_check = cur_t
-                        claim_bgr = safe_grab(sct, claim_box)
-                        if claim_bgr is not None:
-                            c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
-                            c_green = cv2.inRange(
-                                c_hsv,
-                                np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
-                                np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
-                            )
-                            if np.count_nonzero(c_green) > 300:
-                                log_cb(f"[3/4] Phát hiện nút Nhận Ngay -> Kết thúc minigame!")
-                                state = "CLAIM_REWARD"
-                                break
+
+                # Kiểm tra định kỳ nút Nhận Ngay mỗi 0.15s (kể cả khi phao chưa mất, đề phòng popup hiện đè)
+                if cur_t - last_claim_check > 0.15:
+                    last_claim_check = cur_t
+                    claim_bgr = safe_grab(sct, claim_box)
+                    if claim_bgr is not None:
+                        c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
+                        c_green = cv2.inRange(
+                            c_hsv,
+                            np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
+                            np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
+                        )
+                        if np.count_nonzero(c_green) > 250:
+                            log_cb("[3/4] Phát hiện nút Nhận Ngay -> Kết thúc minigame!")
+                            state = "CLAIM_REWARD"
+                            break
 
                 # Nếu minigame > 0.4s mà không thấy phao đỏ > 0.65s -> Trận đã kết thúc!
                 if (cur_t - minigame_start > 0.4) and (cur_t - last_bobber_seen > 0.65):
@@ -735,13 +742,13 @@ def run_fishing_loop(
                     state = "CLAIM_REWARD"
                     break
 
-                # Kiểm tra mất thanh trượt
-                if yellow_range is None and locked_yellow is None:
+                # Kiểm tra mất thanh trượt (chỉ cần không thấy ô vàng trên màn hình là tính timeout kết thúc)
+                if yellow_range is None:
                     if no_slider_since == 0.0:
                         no_slider_since = cur_t
-                    slider_timeout = 0.35 if hit_count >= 2 else 0.85
+                    slider_timeout = 0.35 if hit_count >= 2 else 0.70
                     if cur_t - no_slider_since > slider_timeout:
-                        log_cb(f"[3/4] Kéo cá hoàn tất ({hit_count} Hoàn Hảo). Nhận thưởng...")
+                        log_cb(f"[3/4] Kéo cá hoàn tất ({hit_count} Hoàn Hảo, thanh trượt kết thúc). Nhận thưởng...")
                         state = "CLAIM_REWARD"
                         break
                 else:
@@ -809,26 +816,34 @@ def run_fishing_loop(
                 break
 
         # =========================================================
-        # BƯỚC 4: NHẬN QUÀ / ĐÓNG POPUP (CLAIM_REWARD - 3 NHỊP CHUẨN)
+        # BƯỚC 4: NHẬN QUÀ / ĐÓNG POPUP (CLAIM_REWARD - ĐA TẦNG AN TOÀN)
         # =========================================================
         elif state == "CLAIM_REWARD":
-            log_cb("[4/4] Chờ hoạt ảnh cá (0.6s)...")
-            if _sleep_check(0.6, stop_event):
+            log_cb("[4/4] Chờ hoạt ảnh cá (1.0s)...")
+            if _sleep_check(1.0, stop_event):
                 break
 
-            # Nhịp 1: Chạm trực tiếp tâm thẻ (Rel Y = 0.480) để đóng thẻ Kỷ Lục Mới / Cá Mới
-            _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, "Đóng thẻ kỷ lục (Nhịp 1)", log_cb)
-            if _sleep_check(0.35, stop_event):
-                break
+            # Chuỗi chạm 3 điểm an toàn đa tầng (Tâm thẻ -> Nút giữa -> Nút đáy)
+            # Giúp đóng triệt để mọi popup: Cá Lam, Kỷ Lục Mới, Cá Mới, Chia Sẻ kể cả trên máy giật lag 2GB RAM
+            for attempt in range(4):
+                # Nhịp 1: Chạm tâm thẻ bài kỷ lục / cá mới (Rel Y = 0.480)
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_screen_y, f"Đóng thẻ bài (Lần {attempt + 1})", log_cb)
+                if _sleep_check(0.25, stop_event):
+                    break
 
-            # Nhịp 2: Chạm nút "Nhận Ngay" (Rel Y = 0.870) của màn hình cá thường
-            _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay (Nhịp 2)", log_cb)
-            if _sleep_check(0.35, stop_event):
-                break
+                # Nhịp 2: Chạm nút xác nhận / tiếp tục giữa màn hình (Rel Y = 0.720)
+                _perform_tap(click_mode, adb, vp, card_screen_x, card_confirm_y, f"Chạm xác nhận giữa (Lần {attempt + 1})", log_cb)
+                if _sleep_check(0.25, stop_event):
+                    break
 
-            # Nhịp 3: Xác nhận đóng - nếu nút Nhận Ngay vẫn còn thì bấm tiếp tối đa 3 lần
-            for retry in range(3):
+                # Nhịp 3: Chạm nút Nhận Ngay ở đáy (Rel Y = 0.870)
+                _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, f"Nhận Ngay (Lần {attempt + 1})", log_cb)
+                if _sleep_check(0.35, stop_event):
+                    break
+
+                # Kiểm tra nút Nhận Ngay xem đã biến mất chưa
                 claim_bgr = safe_grab(sct, claim_box)
+                has_green = False
                 if claim_bgr is not None:
                     c_hsv = cv2.cvtColor(claim_bgr, cv2.COLOR_BGR2HSV)
                     c_green = cv2.inRange(
@@ -836,18 +851,20 @@ def run_fishing_loop(
                         np.array(config.HSV_READY_GREEN_LOWER, dtype=np.uint8),
                         np.array(config.HSV_READY_GREEN_UPPER, dtype=np.uint8),
                     )
-                    if np.count_nonzero(c_green) > 300:
-                        log_cb(f"  -> Popup vẫn còn ({np.count_nonzero(c_green)}px xanh), bấm tiếp lần {retry + 1}...")
-                        _perform_tap(click_mode, adb, vp, claim_screen_x, claim_screen_y, "Nhận Ngay bổ sung", log_cb)
-                        if _sleep_check(0.35, stop_event):
-                            break
-                    else:
-                        break
+                    has_green = np.count_nonzero(c_green) > 250
+
+                # Nếu sau ít nhất 1 lần chạm mà không còn nút Nhận Ngay: kiểm tra xem nút cần câu trên bờ đã xuất hiện chưa
+                if not has_green and attempt >= 1:
+                    btn_bgr_chk = safe_grab(sct, btn_box)
+                    if btn_bgr_chk is not None:
+                        chk_g, chk_gr, chk_p = analyze_button_colors(btn_bgr_chk)
+                        if chk_g > config.GREEN_PX_THRESHOLD or chk_gr > config.GREY_PX_THRESHOLD:
+                            break  # Game đã quay về hồ câu thành công!
 
             fish_count += 1
             log_cb(f"[4/4] Nhận thưởng thành công! Tổng số cá: {fish_count}")
 
-            if _sleep_check(0.4, stop_event):
+            if _sleep_check(0.3, stop_event):
                 break
 
             state = "READY_TO_CAST"
