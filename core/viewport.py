@@ -196,12 +196,19 @@ def get_game_viewport(hwnd: int, win_title: str) -> Tuple[int, int, int, int]:
             sidebar_right_px = sr
             break
 
+    # Tự động nhận diện nếu giả lập không có thanh công cụ sidebar (đã ẩn/thu gọn, khung hình 9:16 chuẩn)
+    client_h = max(1, h - title_bar_px)
+    aspect = w / float(client_h)
+    if aspect < 0.60:
+        sidebar_left_px = 0
+        sidebar_right_px = 0
+
     game_left = left + sidebar_left_px
     game_top = top + title_bar_px
     game_w = w - sidebar_left_px - sidebar_right_px
     game_h = h - title_bar_px
 
-    if w > 480 or h > 820:
+    if (sidebar_left_px > 0 or sidebar_right_px > 0 or title_bar_px > 0) and (w > 480 or h > 820):
         scale = max(w / 443.0, h / 761.0)
         tb_adj = int(title_bar_px * scale)
         sl_adj = int(sidebar_left_px * scale)

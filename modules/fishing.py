@@ -399,11 +399,12 @@ def run_fishing_loop(
         card_screen_x = int(gw_l + gw_w * config.CARD_REL_X)
         card_screen_y = int(gw_t + gw_h * config.CARD_REL_Y)
 
+        btn_radius = 55
         btn_box = {
-            "top": btn_screen_y - 30,
-            "left": btn_screen_x - 30,
-            "width": 60,
-            "height": 60,
+            "top": btn_screen_y - btn_radius,
+            "left": btn_screen_x - btn_radius,
+            "width": btn_radius * 2,
+            "height": btn_radius * 2,
         }
 
         scan_box = {
@@ -450,6 +451,8 @@ def run_fishing_loop(
             # 2. Tự động thích ứng vị trí nút câu cá qua dải quét đáy màn hình
             scan_bgr = safe_grab(sct, scan_box)
             bgr = None
+            det_col = None
+            det_area = 0
             if scan_bgr is not None:
                 det = detect_fishing_button(
                     scan_bgr,
@@ -472,19 +475,20 @@ def run_fishing_loop(
                         log_cb(f"[Thích ứng] Khóa tâm nút câu: Rel X = {adaptive_btn_rel_x:.3f}, Rel Y = {adaptive_btn_rel_y:.3f} ({det_col})")
                     btn_screen_x = det_x
                     btn_screen_y = det_y
-                    btn_box["left"] = btn_screen_x - 30
-                    btn_box["top"] = btn_screen_y - 30
+                    btn_box["left"] = btn_screen_x - btn_radius
+                    btn_box["top"] = btn_screen_y - btn_radius
 
                     # Cắt nhanh btn_bgr từ scan_bgr đã có trong RAM (tiết kiệm thời gian chụp màn hình)
-                    rel_l = btn_screen_x - 30 - scan_box["left"]
-                    rel_t = btn_screen_y - 30 - scan_box["top"]
+                    rel_l = btn_screen_x - btn_radius - scan_box["left"]
+                    rel_t = btn_screen_y - btn_radius - scan_box["top"]
+                    box_sz = btn_radius * 2
                     if (
                         0 <= rel_l
                         and 0 <= rel_t
-                        and (rel_l + 60) <= scan_box["width"]
-                        and (rel_t + 60) <= scan_box["height"]
+                        and (rel_l + box_sz) <= scan_box["width"]
+                        and (rel_t + box_sz) <= scan_box["height"]
                     ):
-                        bgr = scan_bgr[rel_t : rel_t + 60, rel_l : rel_l + 60]
+                        bgr = scan_bgr[rel_t : rel_t + box_sz, rel_l : rel_l + box_sz]
 
             if bgr is None:
                 bgr = safe_grab(sct, btn_box)
@@ -496,8 +500,9 @@ def run_fishing_loop(
 
             green_px, grey_px, purple_px = analyze_button_colors(bgr)
 
-            if purple_px > config.PURPLE_PX_THRESHOLD:
-                log_cb(f"[Phục hồi] Cá đang cắn ({purple_px}px tím) -> GIẬT CẦN!")
+            is_bite = (det_col == "purple") or (purple_px > config.PURPLE_PX_THRESHOLD)
+            if is_bite:
+                log_cb(f"[Phục hồi] Cá đang cắn ({det_area or purple_px}px tím) -> GIẬT CẦN!")
                 _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb, is_fast=True)
                 if _sleep_check(0.35, stop_event):
                     break
@@ -505,7 +510,8 @@ def run_fishing_loop(
                 log_cb("[3/4] Quét thanh trượt...")
                 continue
 
-            if grey_px > config.GREY_PX_THRESHOLD:
+            is_grey = (det_col == "grey") or (grey_px > config.GREY_PX_THRESHOLD)
+            if is_grey and not is_bite:
                 log_cb(f"[Phục hồi] Cần dưới nước ({grey_px}px xám) -> Chờ cá cắn...")
                 state = "WAITING_BITE"
                 bite_wait_start = time.time()
@@ -514,7 +520,8 @@ def run_fishing_loop(
                 last_heartbeat = now
                 continue
 
-            if green_px > config.GREEN_PX_THRESHOLD:
+            is_green = (det_col == "green") or (green_px > config.GREEN_PX_THRESHOLD)
+            if is_green:
                 log_cb(f"[1/4] Thả cần ({green_px}px xanh)...")
                 _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Nút quăng cần", log_cb)
                 if _sleep_check(1.5, stop_event):
@@ -564,6 +571,8 @@ def run_fishing_loop(
             # 2. Tự động thích ứng vị trí nút câu cá trong dải đáy màn hình
             scan_bgr = safe_grab(sct, scan_box)
             bgr = None
+            det_col = None
+            det_area = 0
             if scan_bgr is not None:
                 det = detect_fishing_button(
                     scan_bgr,
@@ -586,18 +595,19 @@ def run_fishing_loop(
                         log_cb(f"[Thích ứng] Khóa tâm nút câu khi chờ: Rel X = {adaptive_btn_rel_x:.3f}, Rel Y = {adaptive_btn_rel_y:.3f} ({det_col})")
                     btn_screen_x = det_x
                     btn_screen_y = det_y
-                    btn_box["left"] = btn_screen_x - 30
-                    btn_box["top"] = btn_screen_y - 30
+                    btn_box["left"] = btn_screen_x - btn_radius
+                    btn_box["top"] = btn_screen_y - btn_radius
 
-                    rel_l = btn_screen_x - 30 - scan_box["left"]
-                    rel_t = btn_screen_y - 30 - scan_box["top"]
+                    rel_l = btn_screen_x - btn_radius - scan_box["left"]
+                    rel_t = btn_screen_y - btn_radius - scan_box["top"]
+                    box_sz = btn_radius * 2
                     if (
                         0 <= rel_l
                         and 0 <= rel_t
-                        and (rel_l + 60) <= scan_box["width"]
-                        and (rel_t + 60) <= scan_box["height"]
+                        and (rel_l + box_sz) <= scan_box["width"]
+                        and (rel_t + box_sz) <= scan_box["height"]
                     ):
-                        bgr = scan_bgr[rel_t : rel_t + 60, rel_l : rel_l + 60]
+                        bgr = scan_bgr[rel_t : rel_t + box_sz, rel_l : rel_l + box_sz]
 
             if bgr is None:
                 bgr = safe_grab(sct, btn_box)
@@ -609,7 +619,19 @@ def run_fishing_loop(
 
             green_px, grey_px, purple_px = analyze_button_colors(bgr)
 
-            if green_px > config.GREEN_PX_THRESHOLD and grey_px < 300:
+            # Phát hiện cá cắn (Ưu tiên trực tiếp từ nhận diện thích ứng det_col hoặc qua ngưỡng pixel tím)
+            is_bite = (det_col == "purple") or (purple_px > config.PURPLE_PX_THRESHOLD)
+            if is_bite:
+                log_cb(f"[2/4] CÁ CẮN! ({det_area or purple_px}px tím) -> GIẬT CẦN!")
+                _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb, is_fast=True)
+                if _sleep_check(0.35, stop_event):
+                    break
+                state = "MINIGAME_SLIDER"
+                log_cb("[3/4] Quét thanh trượt minigame...")
+                continue
+
+            is_green = (det_col == "green") or (green_px > config.GREEN_PX_THRESHOLD and grey_px < 300)
+            if is_green and not is_bite:
                 log_cb(f"[Phục hồi] Cần trên bờ ({green_px}px xanh) -> Thả cần lại!")
                 state = "READY_TO_CAST"
                 wait_ready_start = time.time()
@@ -619,18 +641,8 @@ def run_fishing_loop(
                 log_cb(f"[2/4] Đang chờ cá cắn... Xám: {grey_px} | Tím: {purple_px}")
                 last_heartbeat = now
 
-            # Phát hiện cá cắn
-            if purple_px > config.PURPLE_PX_THRESHOLD:
-                log_cb(f"[2/4] CÁ CẮN! ({purple_px}px tím) -> GIẬT CẦN!")
-                _perform_tap(click_mode, adb, vp, btn_screen_x, btn_screen_y, "Giật cần", log_cb, is_fast=True)
-                if _sleep_check(0.35, stop_event):
-                    break
-                state = "MINIGAME_SLIDER"
-                log_cb("[3/4] Quét thanh trượt minigame...")
-                continue
-
-            # Bất thường: Không có cần dưới nước > 3s
-            if grey_px < 100 and purple_px < 100:
+            # Bất thường: Không có cần dưới nước > 3s (chỉ kích hoạt khi chắc chắn không có cá cắn)
+            if not is_bite and grey_px < 100 and purple_px < 100 and det_col != "grey":
                 if no_rod_start == 0.0:
                     no_rod_start = now
                 elif now - no_rod_start > 3.0:
