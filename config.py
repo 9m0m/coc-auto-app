@@ -205,11 +205,11 @@ RALLY_DELAY_AFTER_SCROLL_CLICK: float = 0.40
 RALLY_DELAY_IDLE_SLEEP: float = 0.40
 RALLY_SCAN_INTERVAL: float = 0.40
 
-# Thời gian khóa bỏ qua ô đã đầy trên Mapview (Tối ưu xuống 15s để bắt kịp Rally mới nổ mà không phải đợi 30s)
-RALLY_FULL_TILE_COOLDOWN: float = 15.0
+# Thời gian khóa bỏ qua ô đã đầy trên Mapview (Cân bằng chuẩn 20s theo yêu cầu)
+RALLY_FULL_TILE_COOLDOWN: float = 20.0
 
-# Thời gian chờ kiểm tra lại ô đất vừa tham gia (hỗ trợ bắt các Rally xuất hiện tiếp theo trên cùng ô)
-RALLY_JOINED_COOLDOWN: float = 15.0
+# Thời gian chờ kiểm tra lại ô đất vừa tham gia (20s)
+RALLY_JOINED_COOLDOWN: float = 20.0
 
 # Chế độ hoạt động: False = Focus 100% Tổng Mapview (Khuyên dùng); True = Quét cả Chat
 RALLY_ENABLE_CHAT_SCAN: bool = False
