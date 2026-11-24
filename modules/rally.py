@@ -530,6 +530,7 @@ def scan_and_join_map_rallies(
         # BƯỚC TỰ GIẢI THOÁT: Chạm vùng bản đồ trống phía trên (50%, 20%) để chắc chắn hủy chọn ô đất và đóng mọi panel tồn đọng
         _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất (Tự giải thoát)", log_cb)
         _sleep(0.3, stop_event)
+        ensure_map_overview(sct, vp, adb, stop_event, None)
 
         cooldown = getattr(config, "RALLY_NON_INTERACTIVE_COOLDOWN", 20.0)
         _full_tiles_cooldown[tile] = time.time() + cooldown
@@ -645,6 +646,8 @@ def run_rally_loop(
         if is_pop:
             if is_join:
                 log_cb("Đã xử lý popup tồn đọng & tham gia Rally!")
+            # Sau khi đóng popup ô đất / cứ điểm, lập tức khôi phục toàn cảnh bản đồ nếu bị zoom
+            ensure_map_overview(sct, vp, adb, stop_event, None)
             _sleep(0.5, stop_event)
             continue
 
