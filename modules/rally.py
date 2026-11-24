@@ -428,7 +428,7 @@ def scan_and_join_map_rallies(
     scale_factors = sorted(list({round(s, 2) for s in (configured_scales + dynamic_scales) if 0.45 <= s <= 1.50}), reverse=True)
 
     # 1. ENGINE 1: Universal Timer Pill (Đa ngôn ngữ 100%: Bắt các số mm:ss trên nền đen viền vàng)
-    timer_tpl = _timer_template or assets.get_rally_timer_template()
+    timer_tpl = _timer_template if _timer_template is not None else assets.get_rally_timer_template()
     if timer_tpl is not None:
         t_th, t_tw = timer_tpl.shape[:2]
         timer_thresh = getattr(config, "RALLY_TIMER_MATCH_THRESHOLD", 0.52)
