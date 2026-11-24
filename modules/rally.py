@@ -304,14 +304,33 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, joined_any
 
-    # 2. Type B & C & Single Rally & "Ảo Ảnh": Có nút Back thực sự ở góc trái
+    # 2. Kiểm tra xem có bảng Popup Card (Lane/Ảo Ảnh/Đất) đang mở che nửa dưới màn hình hay không:
+    # Vùng nền thẻ popup (Y: 0.70..0.88, X: 0.15..0.85) có màu tím nhạt/xanh nhạt đặc trưng (S < 75, V > 120)
+    # Trên Mapview, nền là cát vàng sa mạc (S > 100) và 4 nút đáy -> card_ratio cực thấp (< 0.10)
+    roi_card_bg = screen_crop[int(gw_h * 0.70):int(gw_h * 0.88), int(gw_w * 0.15):int(gw_w * 0.85)]
+    hsv_bg = cv2.cvtColor(roi_card_bg, cv2.COLOR_BGR2HSV)
+    card_bg_mask = (hsv_bg[:, :, 1] < 75) & (hsv_bg[:, :, 2] > 120)
+    card_ratio = float(np.count_nonzero(card_bg_mask)) / float(roi_card_bg.shape[0] * roi_card_bg.shape[1])
+
+    roi_title = screen_crop[int(gw_h * 0.50):int(gw_h * 0.60), int(gw_w * 0.03):int(gw_w * 0.45)]
+    gray_title = cv2.cvtColor(roi_title, cv2.COLOR_BGR2GRAY)
+    title_header_found = bool(np.count_nonzero((gray_title > 25) & (gray_title < 70)) > 500)
+
+    is_popup_card_open = bool((card_ratio >= 0.40) or (title_header_found and card_ratio >= 0.25))
+
+    # NẾU KHÔNG CÓ THẺ POPUP NÀO ĐANG MỞ -> ĐANG Ở VIEWMAP TOÀN CẢNH:
+    # TUYỆT ĐỐI KHÔNG BẤM NÚT [X] VÌ ĐÂY LÀ NÚT THOÁT EVENT GOLDRUSH!
+    if not is_popup_card_open:
+        return False, False
+
+    # 3. Type B & C & Single Rally & "Ảo Ảnh": Có nút Back thực sự ở góc trái
     back_x = int(gw_l + gw_w * config.RALLY_POPUP_BACK_X)
     back_y = int(gw_t + gw_h * config.RALLY_POPUP_BACK_Y)
-    crop_back = screen_crop[max(0, int(gw_h * 0.88)):min(gw_h, int(gw_h * 0.98)), max(0, int(gw_w * 0.04)):min(gw_w, int(gw_w * 0.18))]
+    crop_back = screen_crop[int(gw_h * 0.88):int(gw_h * 0.98), int(gw_w * 0.04):int(gw_w * 0.16)]
     hsv_back = cv2.cvtColor(crop_back, cv2.COLOR_BGR2HSV)
-    purple_px = int(np.count_nonzero(cv2.inRange(hsv_back, (110, 30, 40), (160, 255, 255))))
+    purple_px = int(np.count_nonzero(cv2.inRange(hsv_back, (110, 40, 40), (160, 255, 255))))
     white_px = int(np.count_nonzero(cv2.inRange(hsv_back, (0, 0, 180), (180, 50, 255))))
-    has_back_btn = (purple_px >= 30 and white_px >= 50)
+    has_back_btn = (purple_px >= 800 and white_px >= 250)
 
     if has_back_btn:
         bx1, bx2 = int(gw_w * 0.20), int(gw_w * 0.95)
@@ -368,27 +387,12 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         _last_clicked_tile = None
         return True, False
 
-    # 3. Type D: Bảng mỏ vàng phe ta / ô đất / cồn cát bị chọn (có nút [X] ở đáy khi xuất hiện thanh phòng thủ hoặc bảng chi tiết)
-    crop_defense_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.74), int(gw_w * 0.15):int(gw_w * 0.85)]
-    hsv_bar = cv2.cvtColor(crop_defense_bar, cv2.COLOR_BGR2HSV)
-    green_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (35, 100, 100), (85, 255, 255))))
-    red_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (0, 100, 100), (15, 255, 255))) +
-                     np.count_nonzero(cv2.inRange(hsv_bar, (165, 100, 100), (180, 255, 255))))
-    has_defense_bar = (green_bar_px > 1000 or red_bar_px > 1000)
-
+    # 4. Type D: Bảng mỏ vàng phe ta / ô đất đồng minh / lane địch không thể đánh (có nút [X] ở đáy, KHÔNG có nút Back tím)
     crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
     w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
     x_white_px = int(np.count_nonzero(w_x_mask))
 
-    banner_crop = screen_crop[int(gw_h * 0.76):int(gw_h * 0.81), int(gw_w * 0.20):int(gw_w * 0.80)]
-    banner_mean = float(np.mean(banner_crop)) if banner_crop.size > 0 else 0.0
-
-    pill_crop = screen_crop[int(gw_h * 0.63):int(gw_h * 0.68), int(gw_w * 0.03):int(gw_w * 0.35)]
-    pill_mean = float(np.mean(pill_crop)) if pill_crop.size > 0 else 255.0
-
-    is_tile_sheet = (x_white_px > 100) and (has_defense_bar or (banner_mean > 175.0 or pill_mean < 80.0))
-
-    if is_tile_sheet:
+    if x_white_px > 100:
         close_x = int(gw_l + gw_w * 0.50)
         close_y = int(gw_t + gw_h * 0.955)
         _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
