@@ -464,12 +464,19 @@ def scan_and_join_map_rallies(
                 click_y = int(my1 + ty - int(cur_th * avatar_offset_ratio))
                 tile = (click_x, click_y)
 
-                # NMS lọc trùng: nếu ô avatar này đã được thêm trong bán kính 35px thì bỏ qua
-                if not any(abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35 for c in candidates):
+                # Peak-Finding NMS: Luôn cập nhật điểm có score cực đại và tọa độ tâm chuẩn nhất trong bán kính 35px
+                matched_idx = -1
+                for idx, c in enumerate(candidates):
+                    if abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35:
+                        matched_idx = idx
+                        break
+                if matched_idx == -1:
                     candidates.append((click_x, click_y, tile, f"TimerPill_{cur_sc:.2f}", score))
+                elif score > candidates[matched_idx][4]:
+                    candidates[matched_idx] = (click_x, click_y, tile, f"TimerPill_{cur_sc:.2f}", score)
 
     # 2. ENGINE 2: Banner Text Templates (Dự phòng bổ trợ cho Tiếng Việt)
-    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.52)
+    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.58)
     for tname, tpl in _rally_templates:
         is_clean = ("clean" in tname)
         tpl_th, tpl_tw = tpl.shape[:2]
@@ -495,9 +502,16 @@ def scan_and_join_map_rallies(
                 click_y = int(my1 + y + int(cur_th * 1.85))
                 tile = (click_x, click_y)
 
-                # NMS lọc trùng: nếu đã được phát hiện bởi Engine 1 (Timer) hoặc template khác trong 35px thì bỏ qua
-                if not any(abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35 for c in candidates):
+                # Peak-Finding NMS: Cập nhật nếu tìm thấy điểm khớp banner tốt hơn trong bán kính 35px
+                matched_idx = -1
+                for idx, c in enumerate(candidates):
+                    if abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35:
+                        matched_idx = idx
+                        break
+                if matched_idx == -1:
                     candidates.append((click_x, click_y, tile, tname, score))
+                elif score > candidates[matched_idx][4]:
+                    candidates[matched_idx] = (click_x, click_y, tile, tname, score)
 
     # Sắp xếp ưu tiên độ tin cậy score giảm dần
     candidates.sort(key=lambda c: c[4], reverse=True)

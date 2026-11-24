@@ -162,8 +162,8 @@ HSV_RALLY_JOINED_GREEN_UPPER = [85, 255, 255]
 RALLY_JOINED_PX_THRESHOLD: int = 300
 
 # Ngưỡng nhận diện Template Matching tiêu đề 'Tổng Tấn Công!' trên Mapview
-# (Giá trị thực: 0.53 - 0.85 trên màn hình co dãn/phụ. Địa hình đất cát tối đa chỉ đạt <= 0.38. Ngưỡng 0.52 an toàn tuyệt đối)
-RALLY_MATCH_THRESHOLD: float = 0.52
+# Ngưỡng nhận diện cờ Tổng Tấn Công (Rally thật: 0.70 - 0.89. Nhiễu địa hình/khói bụi: <= 0.54. Ngưỡng 0.58 lọc sạch 100% nhiễu)
+RALLY_MATCH_THRESHOLD: float = 0.58
 # Chiều cao chuẩn của viewport làm mốc tính tỉ lệ co dãn tự động (Adaptive Scale)
 RALLY_BASE_REFERENCE_HEIGHT: float = 1530.0
 # Dải tỷ lệ quét chuẩn quanh tỷ lệ 1.0 và mở rộng cho màn hình co nhỏ (720p, 1080p thu nhỏ trên multi-monitor)
@@ -171,8 +171,8 @@ RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92, 0.88, 0.84, 0.80, 1.15]
 # Bán kính kiểm tra trùng lặp ô đất (pixel) - Giảm xuống 30px để không khóa nhầm ô lân cận
 RALLY_FULL_TILE_RADIUS: int = 30
 
-# Cấu hình nhận diện Universal Timer Pill (Đa ngôn ngữ: mm:ss trên nền đen viền vàng)
-RALLY_TIMER_MATCH_THRESHOLD: float = 0.52
+# Cấu hình nhận diện Universal Timer Pill (Đa ngôn ngữ: mm:ss trên nền đen viền vàng, ngưỡng 0.55 lọc sạch nhiễu)
+RALLY_TIMER_MATCH_THRESHOLD: float = 0.55
 RALLY_TIMER_AVATAR_OFFSET_Y: float = 0.85  # Tỉ lệ dịch ngược từ đỉnh Timer lên tâm Avatar: click_y = timer_y - int(th * 0.85)
 
 # Ngưỡng nhận diện bảng Tấn Công ô đất (Hình 2 - Không phải Rally, cần tự đóng về Mapview)
