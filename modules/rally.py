@@ -121,7 +121,9 @@ def _get_effective_vp(sct: mss.MSS, raw_vp: Tuple[int, int, int, int]) -> Tuple[
     return _effective_vp
 
 
-def _is_tile_in_dict(tile: Tuple[int, int], target_dict: Dict[Tuple[int, int], float], threshold: int = 45) -> bool:
+def _is_tile_in_dict(tile: Tuple[int, int], target_dict: Dict[Tuple[int, int], float], threshold: Optional[int] = None) -> bool:
+    if threshold is None:
+        threshold = getattr(config, "RALLY_FULL_TILE_RADIUS", 30)
     tx, ty = tile
     now = time.time()
     return any(abs(tx - cx) < threshold and abs(ty - cy) < threshold for (cx, cy), exp in target_dict.items() if exp > now)
@@ -414,8 +416,15 @@ def scan_and_join_map_rallies(
 
     map_gray = cv2.cvtColor(map_crop, cv2.COLOR_BGR2GRAY)
     matches = []
-    scale_factors = getattr(config, "RALLY_SCALE_FACTORS", [1.00, 1.04, 0.96, 1.08, 0.92])
-    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.60)
+    # Dynamic Adaptive Scaling: Tự động tính tỉ lệ scale tối ưu theo chiều cao cửa sổ game thật của người dùng
+    ref_h = getattr(config, "RALLY_BASE_REFERENCE_HEIGHT", 1530.0)
+    base_scale = gw_h / float(ref_h) if ref_h > 0 else 1.0
+    configured_scales = getattr(config, "RALLY_SCALE_FACTORS", [1.00, 1.04, 0.96, 1.08, 0.92, 0.88, 0.84, 0.80])
+    
+    # Kết hợp dải scale thích ứng tự động và danh sách cấu hình tĩnh
+    dynamic_scales = [base_scale * 1.00, base_scale * 1.04, base_scale * 0.96, base_scale * 1.08, base_scale * 0.92]
+    scale_factors = sorted(list({round(s, 2) for s in (configured_scales + dynamic_scales) if 0.45 <= s <= 1.50}), reverse=True)
+    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.52)
 
     for tname, tpl in _rally_templates:
         is_clean = ("clean" in tname)
@@ -437,7 +446,8 @@ def scan_and_join_map_rallies(
             locs = np.where(res >= match_thresh)
             for pt in zip(*locs[::-1]):
                 x, y = int(pt[0]), int(pt[1])
-                if not any(abs(m[0] - x) < cur_tw * 0.6 and abs(m[1] - y) < cur_th * 0.6 for m in matches):
+                # NMS ngưỡng 0.45 để phân biệt rõ các bong bóng nằm sát / đè mép nhau
+                if not any(abs(m[0] - x) < cur_tw * 0.45 and abs(m[1] - y) < cur_th * 0.45 for m in matches):
                     matches.append((x, y, cur_tw, cur_th, tname, float(res[y, x])))
 
     for x, y, cur_tw, cur_th, faction, score in matches:

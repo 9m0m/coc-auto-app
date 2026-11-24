@@ -162,10 +162,14 @@ HSV_RALLY_JOINED_GREEN_UPPER = [85, 255, 255]
 RALLY_JOINED_PX_THRESHOLD: int = 300
 
 # Ngưỡng nhận diện Template Matching tiêu đề 'Tổng Tấn Công!' trên Mapview
-# (Giá trị thật: 0.62 - 1.00. Khung cảnh map không có Rally tối đa chỉ đạt 0.38. Ngưỡng 0.60 loại trừ 100% false positive địa hình vàng)
-RALLY_MATCH_THRESHOLD: float = 0.60
-# Dải tỷ lệ quét chuẩn quanh tỷ lệ 1.0 (tránh scale quá nhỏ <0.88 gây nhầm lẫn ô đất sa mạc)
-RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92]
+# (Giá trị thực: 0.53 - 0.85 trên màn hình co dãn/phụ. Địa hình đất cát tối đa chỉ đạt <= 0.38. Ngưỡng 0.52 an toàn tuyệt đối)
+RALLY_MATCH_THRESHOLD: float = 0.52
+# Chiều cao chuẩn của viewport làm mốc tính tỉ lệ co dãn tự động (Adaptive Scale)
+RALLY_BASE_REFERENCE_HEIGHT: float = 1530.0
+# Dải tỷ lệ quét chuẩn quanh tỷ lệ 1.0 và mở rộng cho màn hình co nhỏ (720p, 1080p thu nhỏ trên multi-monitor)
+RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92, 0.88, 0.84, 0.80, 1.15]
+# Bán kính kiểm tra trùng lặp ô đất (pixel) - Giảm xuống 30px để không khóa nhầm ô lân cận
+RALLY_FULL_TILE_RADIUS: int = 30
 
 # Ngưỡng nhận diện bảng Tấn Công ô đất (Hình 2 - Không phải Rally, cần tự đóng về Mapview)
 RALLY_TILE_ATTACK_YELLOW_PX: int = 1500  # Nút vàng "Tấn Công" góc dưới bên phải
@@ -201,11 +205,11 @@ RALLY_DELAY_AFTER_SCROLL_CLICK: float = 0.40
 RALLY_DELAY_IDLE_SLEEP: float = 0.40
 RALLY_SCAN_INTERVAL: float = 0.40
 
-# Thời gian khóa bỏ qua ô đã đầy trên Mapview (Đồng bộ 30s để kiểm tra lại các Rally mới nổ)
-RALLY_FULL_TILE_COOLDOWN: float = 30.0
+# Thời gian khóa bỏ qua ô đã đầy trên Mapview (Tối ưu xuống 15s để bắt kịp Rally mới nổ mà không phải đợi 30s)
+RALLY_FULL_TILE_COOLDOWN: float = 15.0
 
 # Thời gian chờ kiểm tra lại ô đất vừa tham gia (hỗ trợ bắt các Rally xuất hiện tiếp theo trên cùng ô)
-RALLY_JOINED_COOLDOWN: float = 30.0
+RALLY_JOINED_COOLDOWN: float = 15.0
 
 # Chế độ hoạt động: False = Focus 100% Tổng Mapview (Khuyên dùng); True = Quét cả Chat
 RALLY_ENABLE_CHAT_SCAN: bool = False
