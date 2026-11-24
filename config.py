@@ -211,6 +211,8 @@ RALLY_SCAN_INTERVAL: float = 0.40
 
 # Thời gian khóa bỏ qua ô đã đầy trên Mapview (Cân bằng chuẩn 20s theo yêu cầu)
 RALLY_FULL_TILE_COOLDOWN: float = 20.0
+# Thời gian khóa bỏ qua ô không mở popup / ô đất trống (20s)
+RALLY_NON_INTERACTIVE_COOLDOWN: float = 20.0
 
 # Thời gian chờ kiểm tra lại ô đất vừa tham gia (20s)
 RALLY_JOINED_COOLDOWN: float = 20.0

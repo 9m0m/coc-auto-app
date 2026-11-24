@@ -304,8 +304,8 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, joined_any
 
-    # 2. Type D: Bảng mỏ vàng phe ta (chỉ bấm nút [X] ở đáy khi xác nhận có thanh quân phòng thủ xanh > 1500px)
-    crop_green_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.72), int(gw_w * 0.15):int(gw_w * 0.85)]
+    # 2. Type D: Bảng mỏ vàng phe ta / ô đất / cồn cát bị chọn (có nút [X] ở đáy khi xuất hiện thanh phòng thủ hoặc bảng chi tiết)
+    crop_green_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.74), int(gw_w * 0.15):int(gw_w * 0.85)]
     hsv_bar = cv2.cvtColor(crop_green_bar, cv2.COLOR_BGR2HSV)
     green_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (35, 100, 100), (85, 255, 255))))
 
@@ -313,16 +313,24 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
     x_white_px = int(np.count_nonzero(w_x_mask))
 
-    if green_bar_px > 1500 and x_white_px > 100:
+    banner_crop = screen_crop[int(gw_h * 0.76):int(gw_h * 0.81), int(gw_w * 0.20):int(gw_w * 0.80)]
+    banner_mean = float(np.mean(banner_crop)) if banner_crop.size > 0 else 0.0
+
+    pill_crop = screen_crop[int(gw_h * 0.63):int(gw_h * 0.68), int(gw_w * 0.03):int(gw_w * 0.35)]
+    pill_mean = float(np.mean(pill_crop)) if pill_crop.size > 0 else 255.0
+
+    is_tile_sheet = (x_white_px > 300) and (green_bar_px > 1500 or banner_mean > 175.0 or pill_mean < 80.0)
+
+    if is_tile_sheet:
         close_x = int(gw_l + gw_w * 0.50)
         close_y = int(gw_t + gw_h * 0.955)
-        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất đồng minh (Nút X)", log_cb)
+        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
         if _last_clicked_tile is not None:
             cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
             _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
             if log_cb:
-                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đồng minh -> Khóa ô {int(cooldown)}s")
+                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất/tài nguyên -> Bỏ qua {int(cooldown)}s")
         _last_clicked_tile = None
         return True, False
 
@@ -518,16 +526,15 @@ def scan_and_join_map_rallies(
         if is_pop:
             return "JOINED" if is_join else "FULL"
 
-        # Nếu đã bấm mở nhưng không có bất kỳ popup nào xuất hiện (ô không tương tác / lag / đã kết thúc):
-        # Đưa ô này vào cooldown để tránh liên tục bấm và nhìn chăm chú vào ô đó
-        cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 20.0)
+        # Nếu đã bấm mở nhưng không có bất kỳ popup nào xuất hiện (ô không tương tác / lag / đã kết thúc / vô tình chọn ô đất):
+        # BƯỚC TỰ GIẢI THOÁT: Chạm vùng bản đồ trống phía trên (50%, 20%) để chắc chắn hủy chọn ô đất và đóng mọi panel tồn đọng
+        _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất (Tự giải thoát)", log_cb)
+        _sleep(0.3, stop_event)
+
+        cooldown = getattr(config, "RALLY_NON_INTERACTIVE_COOLDOWN", 20.0)
         _full_tiles_cooldown[tile] = time.time() + cooldown
         if log_cb:
-            log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Tạm bỏ qua {int(cooldown)}s")
-        _last_clicked_tile = None
-        return "CLICKED"
-        if log_cb:
-            log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Tạm bỏ qua {int(cooldown)}s")
+            log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Đã tự giải thoát & tạm bỏ qua {int(cooldown)}s")
         _last_clicked_tile = None
         return "CLICKED"
 
