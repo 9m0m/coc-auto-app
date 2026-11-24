@@ -499,6 +499,100 @@ class TestRallyCases(unittest.TestCase):
         self.assertEqual(len(self.mock_adb.taps), 1)
         self.assertAlmostEqual(self.mock_adb.taps[0][0] / self.mock_adb.screen_size[0], config.RALLY_POPUP_BACK_X, delta=0.08)
 
+    def test_case_14_scaled_windows(self):
+        """
+        Kiểm thử giả lập bị thu nhỏ trên các màn hình laptop nhỏ hoặc cửa sổ co giãn:
+        Scale từ 0.35x (cửa sổ siêu nhỏ ~200x340px) đến 2.0x (màn hình độ nét cao 2K/4K).
+        Đảm bảo 100% độ chính xác:
+        - Viewmap (Hình 1): Tuyệt đối KHÔNG bao giờ bấm [X].
+        - Các popup (Hình 2..6): Đóng chuẩn xác bằng Back hoặc [X] tương ứng.
+        """
+        user_dir = r"C:/Users/ADMIN/.gemini/antigravity/brain/93b2c7c8-abdd-44b8-bc5f-e53ca99e9bbe/.user_uploaded"
+        user_files = sorted(glob.glob(os.path.join(user_dir, "*.jpg")))
+        if len(user_files) < 6:
+            self.skipTest("Không tìm thấy đủ 6 ảnh người dùng")
+
+        test_scales = [0.35, 0.50, 0.70, 1.50]
+        for sc in test_scales:
+            # 1. Hình 1 (Viewmap)
+            img1 = cv2.imread(user_files[0])
+            h1, w1 = img1.shape[:2]
+            scaled1 = cv2.resize(img1, (int(w1 * sc), int(h1 * sc)))
+            sh1, sw1 = scaled1.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw1, sh1)
+            with patch("modules.rally.safe_grab", return_value=scaled1):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw1, sh1), self.mock_adb, self.stop_event)
+            self.assertFalse(is_pop, f"Scale {sc}: Viewmap không được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 0, f"Scale {sc}: Viewmap không được bấm nút X!")
+
+            # 2. Hình 2 (Lane có đường đánh -> Back)
+            img2 = cv2.imread(user_files[1])
+            h2, w2 = img2.shape[:2]
+            scaled2 = cv2.resize(img2, (int(w2 * sc), int(h2 * sc)))
+            sh2, sw2 = scaled2.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw2, sh2)
+            with patch("modules.rally.safe_grab", return_value=scaled2):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw2, sh2), self.mock_adb, self.stop_event)
+            self.assertTrue(is_pop, f"Scale {sc}: Hình 2 phải được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 1, f"Scale {sc}: Hình 2 phải tap đúng 1 lần")
+            self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw2, config.RALLY_POPUP_BACK_X, delta=0.08)
+
+            # 3. Hình 3 (Đất đồng minh -> Nút X)
+            img3 = cv2.imread(user_files[2])
+            h3, w3 = img3.shape[:2]
+            scaled3 = cv2.resize(img3, (int(w3 * sc), int(h3 * sc)))
+            sh3, sw3 = scaled3.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw3, sh3)
+            with patch("modules.rally.safe_grab", return_value=scaled3):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw3, sh3), self.mock_adb, self.stop_event)
+            self.assertTrue(is_pop, f"Scale {sc}: Hình 3 phải được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw3, 0.50, delta=0.08)
+            self.assertAlmostEqual(self.mock_adb.taps[0][1] / sh3, 0.955, delta=0.08)
+
+            # 4. Hình 4 (Ảo ảnh không có đường đánh -> Back)
+            img4 = cv2.imread(user_files[3])
+            h4, w4 = img4.shape[:2]
+            scaled4 = cv2.resize(img4, (int(w4 * sc), int(h4 * sc)))
+            sh4, sw4 = scaled4.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw4, sh4)
+            with patch("modules.rally.safe_grab", return_value=scaled4):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw4, sh4), self.mock_adb, self.stop_event)
+            self.assertTrue(is_pop, f"Scale {sc}: Hình 4 phải được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw4, config.RALLY_POPUP_BACK_X, delta=0.08)
+
+            # 5. Hình 5 (Lane địch không có đường đánh -> Nút X)
+            img5 = cv2.imread(user_files[4])
+            h5, w5 = img5.shape[:2]
+            scaled5 = cv2.resize(img5, (int(w5 * sc), int(h5 * sc)))
+            sh5, sw5 = scaled5.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw5, sh5)
+            with patch("modules.rally.safe_grab", return_value=scaled5):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw5, sh5), self.mock_adb, self.stop_event)
+            self.assertTrue(is_pop, f"Scale {sc}: Hình 5 phải được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw5, 0.50, delta=0.08)
+            self.assertAlmostEqual(self.mock_adb.taps[0][1] / sh5, 0.955, delta=0.08)
+
+            # 6. Hình 6 (Ảo ảnh có đường đánh -> Back)
+            img6 = cv2.imread(user_files[5])
+            h6, w6 = img6.shape[:2]
+            scaled6 = cv2.resize(img6, (int(w6 * sc), int(h6 * sc)))
+            sh6, sw6 = scaled6.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (sw6, sh6)
+            with patch("modules.rally.safe_grab", return_value=scaled6):
+                is_pop, _ = rally._handle_rally_detail_popup(None, (0, 0, sw6, sh6), self.mock_adb, self.stop_event)
+            self.assertTrue(is_pop, f"Scale {sc}: Hình 6 phải được nhận là popup")
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw6, config.RALLY_POPUP_BACK_X, delta=0.08)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

@@ -190,9 +190,10 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     contours_m, _ = cv2.findContours(green_mask_m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     found_confirm_btn = None
+    min_confirm_h = max(18, int(gw_h * 0.022))
     for c in contours_m:
         cx, cy, bw, bh = cv2.boundingRect(c)
-        if bw >= int(gw_w * 0.20) and bh >= 35 and (1.5 <= bw / bh <= 6.0):
+        if bw >= int(gw_w * 0.20) and bh >= min_confirm_h and (1.5 <= bw / bh <= 6.0):
             confirm_x = int(gw_l + gw_w * 0.20 + cx + bw // 2)
             confirm_y = int(gw_t + gw_h * 0.55 + cy + bh // 2)
             found_confirm_btn = (confirm_x, confirm_y)
@@ -202,9 +203,11 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         header_crop = screen_crop[int(gw_h * 0.30):int(gw_h * 0.42), int(gw_w * 0.10):int(gw_w * 0.90)]
         hsv_h = cv2.cvtColor(header_crop, cv2.COLOR_BGR2HSV)
         purple_px = np.count_nonzero(cv2.inRange(hsv_h, np.array([115, 50, 50]), np.array([165, 255, 255])))
+        tot_header = max(1, header_crop.shape[0] * header_crop.shape[1])
+        purple_ratio = float(purple_px) / float(tot_header)
         body_crop = screen_crop[int(gw_h * 0.40):int(gw_h * 0.58), int(gw_w * 0.15):int(gw_w * 0.85)]
 
-        if purple_px > 2000 or np.mean(body_crop) > 150:
+        if purple_ratio > 0.05 or np.mean(body_crop) > 150:
             confirm_x, confirm_y = found_confirm_btn
             if log_cb:
                 log_cb("Phát hiện thông báo 'Không thể tấn công ô mục tiêu' -> Bấm Xác Nhận")
@@ -235,9 +238,11 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             contours_g, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             btns = []
             min_btn_w = int(gw_w * 0.16)
+            min_btn_h = max(12, int(gw_h * 0.012))
+            max_btn_h = max(35, int(gw_h * 0.055))
             for c in contours_g:
                 cx, cy, bw, bh = cv2.boundingRect(c)
-                if bw >= min_btn_w and 18 <= bh <= 55:
+                if bw >= min_btn_w and min_btn_h <= bh <= max_btn_h:
                     btns.append((bx1 + cx + bw // 2, by1 + cy + bh // 2))
             btns.sort(key=lambda b: b[1])
             return btns
@@ -251,7 +256,9 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
         contours_grey_chk, _ = cv2.findContours(grey_mask_chk, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         min_btn_w = int(gw_w * 0.16)
         max_btn_w = int(gw_w * 0.40)
-        has_any_card = (len(green_btns) > 0 or any(min_btn_w <= cv2.boundingRect(c)[2] <= max_btn_w and 18 <= cv2.boundingRect(c)[3] <= 55 for c in contours_grey_chk))
+        min_btn_h = max(12, int(gw_h * 0.012))
+        max_btn_h = max(35, int(gw_h * 0.055))
+        has_any_card = (len(green_btns) > 0 or any(min_btn_w <= cv2.boundingRect(c)[2] <= max_btn_w and min_btn_h <= cv2.boundingRect(c)[3] <= max_btn_h for c in contours_grey_chk))
 
         if not has_any_card:
             # Không phát hiện thẻ Rally nào ở cột bên phải -> Không phải bảng danh sách Rally
@@ -314,7 +321,9 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
 
     roi_title = screen_crop[int(gw_h * 0.50):int(gw_h * 0.60), int(gw_w * 0.03):int(gw_w * 0.45)]
     gray_title = cv2.cvtColor(roi_title, cv2.COLOR_BGR2GRAY)
-    title_header_found = bool(np.count_nonzero((gray_title > 25) & (gray_title < 70)) > 500)
+    tot_title = max(1, roi_title.shape[0] * roi_title.shape[1])
+    title_ratio = float(np.count_nonzero((gray_title > 25) & (gray_title < 70))) / float(tot_title)
+    title_header_found = bool(title_ratio > 0.05)
 
     is_popup_card_open = bool((card_ratio >= 0.40) or (title_header_found and card_ratio >= 0.25))
 
@@ -330,19 +339,27 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     hsv_back = cv2.cvtColor(crop_back, cv2.COLOR_BGR2HSV)
     purple_px = int(np.count_nonzero(cv2.inRange(hsv_back, (110, 40, 40), (160, 255, 255))))
     white_px = int(np.count_nonzero(cv2.inRange(hsv_back, (0, 0, 180), (180, 50, 255))))
-    has_back_btn = (purple_px >= 800 and white_px >= 250)
+    tot_back = max(1, crop_back.shape[0] * crop_back.shape[1])
+    purple_ratio = float(purple_px) / float(tot_back)
+    white_ratio = float(white_px) / float(tot_back)
+    has_back_btn = (purple_ratio >= 0.20 and white_ratio >= 0.08)
 
     if has_back_btn:
         bx1, bx2 = int(gw_w * 0.20), int(gw_w * 0.95)
         by1, by2 = int(gw_h * 0.88), int(gw_h * 0.98)
         btn_crop = screen_crop[by1:by2, bx1:bx2]
         hsv_btn = cv2.cvtColor(btn_crop, cv2.COLOR_BGR2HSV)
+        tot_btn = max(1, btn_crop.shape[0] * btn_crop.shape[1])
 
         yellow_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (15, 100, 100), (35, 255, 255))))
         green_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (35, 100, 100), (85, 255, 255))))
         grey_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (0, 0, 80), (180, 40, 210))))
 
-        if yellow_px > 2500:
+        yellow_ratio = float(yellow_px) / float(tot_btn)
+        green_ratio = float(green_px) / float(tot_btn)
+        grey_ratio = float(grey_px) / float(tot_btn)
+
+        if yellow_ratio >= 0.08:
             if _last_clicked_tile is not None:
                 cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
                 _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
@@ -353,7 +370,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, False
 
-        if green_px > 1500:
+        if green_ratio >= 0.05:
             join_btn_x = int(gw_l + gw_w * 0.72)
             join_btn_y = int(gw_t + gw_h * 0.93)
             _adb_tap(adb, vp, join_btn_x, join_btn_y, "Tham gia Rally lẻ", log_cb)
@@ -365,7 +382,7 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, True
 
-        if grey_px > 1000:
+        if grey_ratio >= 0.04:
             if _last_clicked_tile is not None:
                 cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
                 _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
@@ -390,9 +407,10 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
     # 4. Type D: Bảng mỏ vàng phe ta / ô đất đồng minh / lane địch không thể đánh (có nút [X] ở đáy, KHÔNG có nút Back tím)
     crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
     w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
-    x_white_px = int(np.count_nonzero(w_x_mask))
+    tot_x = max(1, crop_close_x.shape[0] * crop_close_x.shape[1])
+    x_ratio = float(np.count_nonzero(w_x_mask)) / float(tot_x)
 
-    if x_white_px > 100:
+    if x_ratio >= 0.04:
         close_x = int(gw_l + gw_w * 0.50)
         close_y = int(gw_t + gw_h * 0.955)
         _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
@@ -440,7 +458,8 @@ def scan_and_join_map_rallies(
     
     # Kết hợp dải scale thích ứng tự động và danh sách cấu hình tĩnh
     dynamic_scales = [base_scale * 1.00, base_scale * 1.04, base_scale * 0.96, base_scale * 1.08, base_scale * 0.92, base_scale * 0.85]
-    scale_factors = sorted(list({round(s, 2) for s in (configured_scales + dynamic_scales) if 0.45 <= s <= 1.50}), reverse=True)
+    scale_factors = sorted(list({round(s, 2) for s in (configured_scales + dynamic_scales) if 0.25 <= s <= 1.80}), reverse=True)
+    cluster_radius = max(16, int(35 * (gw_h / ref_h)))
 
     # 1. ENGINE 1: Universal Timer Pill (Đa ngôn ngữ 100%: Bắt các số mm:ss trên nền đen viền vàng)
     timer_tpl = _timer_template if _timer_template is not None else assets.get_rally_timer_template()
@@ -471,10 +490,10 @@ def scan_and_join_map_rallies(
                 click_y = int(my1 + ty - int(cur_th * avatar_offset_ratio))
                 tile = (click_x, click_y)
 
-                # Peak-Finding NMS: Luôn cập nhật điểm có score cực đại và tọa độ tâm chuẩn nhất trong bán kính 35px
+                # Peak-Finding NMS: Luôn cập nhật điểm có score cực đại và tọa độ tâm chuẩn nhất trong bán kính cluster_radius
                 matched_idx = -1
                 for idx, c in enumerate(candidates):
-                    if abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35:
+                    if abs(c[0] - click_x) < cluster_radius and abs(c[1] - click_y) < cluster_radius:
                         matched_idx = idx
                         break
                 if matched_idx == -1:
@@ -509,10 +528,10 @@ def scan_and_join_map_rallies(
                 click_y = int(my1 + y + int(cur_th * 1.85))
                 tile = (click_x, click_y)
 
-                # Peak-Finding NMS: Cập nhật nếu tìm thấy điểm khớp banner tốt hơn trong bán kính 35px
+                # Peak-Finding NMS: Cập nhật nếu tìm thấy điểm khớp banner tốt hơn trong bán kính cluster_radius
                 matched_idx = -1
                 for idx, c in enumerate(candidates):
-                    if abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35:
+                    if abs(c[0] - click_x) < cluster_radius and abs(c[1] - click_y) < cluster_radius:
                         matched_idx = idx
                         break
                 if matched_idx == -1:
