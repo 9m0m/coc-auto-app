@@ -71,10 +71,16 @@ Khi có thay đổi logic ảnh hưởng đến file chạy:
 
 ---
 
-## 3. CHECKLIST DÀNH CHO AGENT TRƯỚC KHI TRẢ LỜI NGƯỜI DÙNG
+## 3. PHẠM VI DỰ ÁN (SINGLE REPO OF TRUTH)
+* **Dự án chính thức duy nhất**: `c:\ky_9_FPT\coc-auto-app` (Đây là phiên bản chuẩn có giao diện UI hoàn chỉnh, hệ thống ADB, Vision, Logging và Build PyInstaller).
+* **TUYỆT ĐỐI KHÔNG ĐỤNG TỚI `scripauto`**: Thư mục `c:\ky_9_FPT\scripauto` là mã nguồn cũ (legacy/deprecated). Mọi sửa đổi, kiểm thử, build exe và commit chỉ thực hiện duy nhất trên `coc-auto-app`.
+
+---
+
+## 4. CHECKLIST DÀNH CHO AGENT TRƯỚC KHI TRẢ LỜI NGƯỜI DÙNG
 
 1. [ ] Đã sửa code tuân thủ 100% mục 1 (không có `array or fallback`, không ép boolean mảng).
 2. [ ] Đã chạy `python tests/test_code_quality.py` và toàn bộ test PASS.
-3. [ ] Đã đồng bộ mã nguồn giữa cả 2 repo (`coc-auto-app` và `scripauto`).
+3. [ ] Chỉ làm việc duy nhất trên repo `coc-auto-app` (không đụng tới `scripauto`).
 4. [ ] Nếu thay đổi liên quan đến tính năng chính, đã build lại file thực thi `.exe` thành công.
-5. [ ] Đã commit và push đồng bộ lên GitHub.
+5. [ ] Đã commit và push lên GitHub `coc-auto-app`.
