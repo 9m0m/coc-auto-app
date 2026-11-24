@@ -20,6 +20,7 @@ from core.adb_manager import ADBManager
 
 # Quản lý trạng thái nội bộ của Rally
 _rally_templates = assets.get_rally_templates()
+_timer_template = assets.get_rally_timer_template()
 _full_tiles_cooldown: Dict[Tuple[int, int], float] = {}
 _recently_joined_tiles: Dict[Tuple[int, int], float] = {}
 _last_clicked_tile: Optional[Tuple[int, int]] = None
@@ -415,17 +416,52 @@ def scan_and_join_map_rallies(
         return None
 
     map_gray = cv2.cvtColor(map_crop, cv2.COLOR_BGR2GRAY)
-    matches = []
+    candidates: List[Tuple[int, int, Tuple[int, int], str, float]] = []
+
     # Dynamic Adaptive Scaling: Tự động tính tỉ lệ scale tối ưu theo chiều cao cửa sổ game thật của người dùng
     ref_h = getattr(config, "RALLY_BASE_REFERENCE_HEIGHT", 1530.0)
     base_scale = gw_h / float(ref_h) if ref_h > 0 else 1.0
     configured_scales = getattr(config, "RALLY_SCALE_FACTORS", [1.00, 1.04, 0.96, 1.08, 0.92, 0.88, 0.84, 0.80])
     
     # Kết hợp dải scale thích ứng tự động và danh sách cấu hình tĩnh
-    dynamic_scales = [base_scale * 1.00, base_scale * 1.04, base_scale * 0.96, base_scale * 1.08, base_scale * 0.92]
+    dynamic_scales = [base_scale * 1.00, base_scale * 1.04, base_scale * 0.96, base_scale * 1.08, base_scale * 0.92, base_scale * 0.85]
     scale_factors = sorted(list({round(s, 2) for s in (configured_scales + dynamic_scales) if 0.45 <= s <= 1.50}), reverse=True)
-    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.52)
 
+    # 1. ENGINE 1: Universal Timer Pill (Đa ngôn ngữ 100%: Bắt các số mm:ss trên nền đen viền vàng)
+    timer_tpl = _timer_template or assets.get_rally_timer_template()
+    if timer_tpl is not None:
+        t_th, t_tw = timer_tpl.shape[:2]
+        timer_thresh = getattr(config, "RALLY_TIMER_MATCH_THRESHOLD", 0.52)
+        avatar_offset_ratio = getattr(config, "RALLY_TIMER_AVATAR_OFFSET_Y", 0.85)
+
+        for cur_sc in scale_factors:
+            cur_tw = max(15, int(t_tw * cur_sc))
+            cur_th = max(10, int(t_th * cur_sc))
+            if cur_tw >= map_crop.shape[1] or cur_th >= map_crop.shape[0]:
+                continue
+
+            scaled_timer = cv2.resize(
+                timer_tpl,
+                (cur_tw, cur_th),
+                interpolation=cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR,
+            )
+            res_timer = cv2.matchTemplate(map_crop, scaled_timer, cv2.TM_CCOEFF_NORMED)
+            locs_timer = np.where(res_timer >= timer_thresh)
+            for pt in zip(*locs_timer[::-1]):
+                tx, ty = int(pt[0]), int(pt[1])
+                score = float(res_timer[ty, tx])
+
+                # Click rơi thẳng vào TÂM AVATAR (dịch ngược lên trên thanh timer)
+                click_x = int(gw_l + tx + cur_tw // 2)
+                click_y = int(my1 + ty - int(cur_th * avatar_offset_ratio))
+                tile = (click_x, click_y)
+
+                # NMS lọc trùng: nếu ô avatar này đã được thêm trong bán kính 35px thì bỏ qua
+                if not any(abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35 for c in candidates):
+                    candidates.append((click_x, click_y, tile, f"TimerPill_{cur_sc:.2f}", score))
+
+    # 2. ENGINE 2: Banner Text Templates (Dự phòng bổ trợ cho Tiếng Việt)
+    match_thresh = getattr(config, "RALLY_MATCH_THRESHOLD", 0.52)
     for tname, tpl in _rally_templates:
         is_clean = ("clean" in tname)
         tpl_th, tpl_tw = tpl.shape[:2]
@@ -446,26 +482,30 @@ def scan_and_join_map_rallies(
             locs = np.where(res >= match_thresh)
             for pt in zip(*locs[::-1]):
                 x, y = int(pt[0]), int(pt[1])
-                # NMS ngưỡng 0.45 để phân biệt rõ các bong bóng nằm sát / đè mép nhau
-                if not any(abs(m[0] - x) < cur_tw * 0.45 and abs(m[1] - y) < cur_th * 0.45 for m in matches):
-                    matches.append((x, y, cur_tw, cur_th, tname, float(res[y, x])))
+                score = float(res[y, x])
+                click_x = int(gw_l + x + cur_tw // 2)
+                click_y = int(my1 + y + int(cur_th * 1.85))
+                tile = (click_x, click_y)
 
-    for x, y, cur_tw, cur_th, faction, score in matches:
+                # NMS lọc trùng: nếu đã được phát hiện bởi Engine 1 (Timer) hoặc template khác trong 35px thì bỏ qua
+                if not any(abs(c[0] - click_x) < 35 and abs(c[1] - click_y) < 35 for c in candidates):
+                    candidates.append((click_x, click_y, tile, tname, score))
+
+    # Sắp xếp ưu tiên độ tin cậy score giảm dần
+    candidates.sort(key=lambda c: c[4], reverse=True)
+
+    for click_x, click_y, tile, faction, score in candidates:
         if stop_event.is_set():
             return None
-
-        click_x = int(gw_l + x + cur_tw // 2)
-        click_y = int(my1 + y + int(cur_th * 1.85))
-        tile = (click_x, click_y)
 
         if _is_tile_in_dict(tile, _recently_joined_tiles) or _is_tile_in_dict(tile, _full_tiles_cooldown):
             continue
 
         _last_clicked_tile = tile
         if log_cb:
-            log_cb(f"Phát hiện Rally ({faction}) độ khớp {score:.2f} -> Bấm mở Popup")
+            log_cb(f"Phát hiện Rally ({faction}) độ khớp {score:.2f} -> Bấm mở Avatar tại ({click_x}, {click_y})")
 
-        _adb_tap(adb, vp, click_x, click_y, f"Mở Rally tại ({click_x}, {click_y})", log_cb)
+        _adb_tap(adb, vp, click_x, click_y, f"Mở Rally tại Avatar ({click_x}, {click_y})", log_cb)
         if _sleep(config.RALLY_DELAY_AFTER_MAP_CLICK, stop_event):
             return None
 
@@ -480,8 +520,12 @@ def scan_and_join_map_rallies(
 
         # Nếu đã bấm mở nhưng không có bất kỳ popup nào xuất hiện (ô không tương tác / lag / đã kết thúc):
         # Đưa ô này vào cooldown để tránh liên tục bấm và nhìn chăm chú vào ô đó
-        cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+        cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 20.0)
         _full_tiles_cooldown[tile] = time.time() + cooldown
+        if log_cb:
+            log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Tạm bỏ qua {int(cooldown)}s")
+        _last_clicked_tile = None
+        return "CLICKED"
         if log_cb:
             log_cb(f"Ô ({tile[0]}, {tile[1]}) không mở Popup -> Tạm bỏ qua {int(cooldown)}s")
         _last_clicked_tile = None

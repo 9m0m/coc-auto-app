@@ -171,6 +171,10 @@ RALLY_SCALE_FACTORS = [1.00, 1.04, 0.96, 1.08, 0.92, 0.88, 0.84, 0.80, 1.15]
 # Bán kính kiểm tra trùng lặp ô đất (pixel) - Giảm xuống 30px để không khóa nhầm ô lân cận
 RALLY_FULL_TILE_RADIUS: int = 30
 
+# Cấu hình nhận diện Universal Timer Pill (Đa ngôn ngữ: mm:ss trên nền đen viền vàng)
+RALLY_TIMER_MATCH_THRESHOLD: float = 0.52
+RALLY_TIMER_AVATAR_OFFSET_Y: float = 0.85  # Tỉ lệ dịch ngược từ đỉnh Timer lên tâm Avatar: click_y = timer_y - int(th * 0.85)
+
 # Ngưỡng nhận diện bảng Tấn Công ô đất (Hình 2 - Không phải Rally, cần tự đóng về Mapview)
 RALLY_TILE_ATTACK_YELLOW_PX: int = 1500  # Nút vàng "Tấn Công" góc dưới bên phải
 RALLY_TILE_ATTACK_RED_PX: int = 1500     # Thanh máu phòng thủ đỏ "Quân phòng thủ"
