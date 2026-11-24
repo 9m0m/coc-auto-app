@@ -31,17 +31,14 @@ def find_adb_binary() -> str:
             os.makedirs(target_bin_dir, exist_ok=True)
 
             target_adb = os.path.join(target_bin_dir, "adb.exe")
-            target_dll = os.path.join(target_bin_dir, "AdbWinApi.dll")
-
             src_bin_dir = os.path.join(sys._MEIPASS, "binaries")  # type: ignore
-            src_adb = os.path.join(src_bin_dir, "adb.exe")
-            src_dll = os.path.join(src_bin_dir, "AdbWinApi.dll")
 
             import shutil
-            if os.path.isfile(src_adb) and (not os.path.isfile(target_adb) or os.path.getsize(target_adb) != os.path.getsize(src_adb)):
-                shutil.copy2(src_adb, target_adb)
-            if os.path.isfile(src_dll) and (not os.path.isfile(target_dll) or os.path.getsize(target_dll) != os.path.getsize(src_dll)):
-                shutil.copy2(src_dll, target_dll)
+            for name in ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"]:
+                src = os.path.join(src_bin_dir, name)
+                tgt = os.path.join(target_bin_dir, name)
+                if os.path.isfile(src) and (not os.path.isfile(tgt) or os.path.getsize(tgt) != os.path.getsize(src)):
+                    shutil.copy2(src, tgt)
 
             if os.path.isfile(target_adb):
                 return target_adb
@@ -53,12 +50,38 @@ def find_adb_binary() -> str:
     if os.path.isfile(local_bin):
         return local_bin
 
-    # 3. Tìm trong BlueStacks_nxt nếu có
+    # 3. Tìm trong LDPlayer nếu có (giúp đồng bộ 100% phiên bản adb daemon của LDPlayer)
+    try:
+        for reg_key in [r"SOFTWARE\leidian\ldplayer9", r"SOFTWARE\WOW6432Node\leidian\ldplayer9"]:
+            for hive in [winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER]:
+                try:
+                    with winreg.OpenKey(hive, reg_key) as key:
+                        install_dir, _ = winreg.QueryValueEx(key, "InstallDir")
+                        ld_adb = os.path.join(install_dir, "adb.exe")
+                        if os.path.isfile(ld_adb):
+                            return ld_adb
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    for drive in ["C", "D", "E", "F"]:
+        for candidate in [
+            rf"{drive}:\LDPlayer\LDPlayer9\adb.exe",
+            rf"{drive}:\LDPlayer\LDPlayer4.0\adb.exe",
+            rf"{drive}:\leidian\LDPlayer9\adb.exe",
+            rf"{drive}:\Program Files\LDPlayer\LDPlayer9\adb.exe",
+            rf"{drive}:\Program Files (x86)\LDPlayer\LDPlayer9\adb.exe",
+        ]:
+            if os.path.isfile(candidate):
+                return candidate
+
+    # 4. Tìm trong BlueStacks_nxt nếu có
     bs_adb = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
     if os.path.isfile(bs_adb):
         return bs_adb
 
-    # 4. Mặc định gọi "adb" từ PATH
+    # 5. Mặc định gọi "adb" từ PATH
     return "adb"
 
 
@@ -69,9 +92,12 @@ class ADBManager:
         self.adb_bin = adb_path or find_adb_binary()
         self.active_serial: Optional[str] = None
         self.screen_size: Optional[Tuple[int, int]] = None  # (width, height)
+        self.last_error: str = ""
 
     def run_cmd(self, args: List[str], timeout: float = 5.0) -> Tuple[int, str]:
-        """Chạy một lệnh ADB và trả về (exit_code, stdout)."""
+        """Chạy một lệnh ADB và trả về (exit_code, output).
+        Trả về kết hợp cả stdout và stderr để không bao giờ bị nuốt thông báo lỗi từ ADB.
+        """
         cmd = [self.adb_bin] + args
         try:
             # CREATE_NO_WINDOW = 0x08000000 để không bật cửa sổ cmd đen
@@ -86,7 +112,13 @@ class ADBManager:
                 encoding="utf-8",
                 errors="replace",
             )
-            return proc.returncode, proc.stdout.strip()
+            out = proc.stdout.strip()
+            err = proc.stderr.strip()
+            # Kết hợp hoặc ưu tiên thông tin lỗi nếu thất bại
+            combined = out if not err else (f"{out}\n{err}".strip() if out else err)
+            return proc.returncode, combined
+        except subprocess.TimeoutExpired:
+            return -1, f"Lệnh ADB bị quá thời gian ({timeout}s)"
         except Exception as e:
             return -1, str(e)
 
@@ -201,6 +233,9 @@ class ADBManager:
         # Kiểm tra xem có thiết bị nào đã sẵn sàng chưa
         ready = self.get_connected_devices()
         if ready:
+            # Nếu có hint LDPlayer, ưu tiên emulator-5554 hơn 127.0.0.1:5555 nếu cả 2 cùng xuất hiện
+            if emulator_hint and any(k in emulator_hint.lower() for k in ["ld", "dn"]):
+                ready.sort(key=lambda d: 0 if "emulator" in d else 1)
             self.active_serial = ready[0]
             self.refresh_screen_size()
             return self.active_serial
@@ -289,8 +324,10 @@ class ADBManager:
         Thực hiện click ngầm (tap) vào tọa độ (x, y) trên màn hình Android.
         Mặc định tạo độ lệch ngẫu nhiên nhẹ (±2 pixel) mô phỏng ngón tay người bấm thực tế,
         loại bỏ hoàn toàn nguy cơ bị server game phát hiện việc lặp lại tọa độ chuẩn xác tuyệt đối.
+        Tự động fallback qua lệnh su nếu Android/LDPlayer yêu cầu quyền root.
         """
         if not self.active_serial:
+            self.last_error = "Chưa kết nối thiết bị ADB"
             return False
 
         tap_x = int(x)
@@ -300,17 +337,40 @@ class ADBManager:
             tap_x += random.randint(-2, 2)
             tap_y += random.randint(-2, 2)
 
-        code, _ = self.run_cmd(
+        # 1. Thử gửi lệnh input tap tiêu chuẩn
+        code, out = self.run_cmd(
             ["-s", self.active_serial, "shell", "input", "tap", str(tap_x), str(tap_y)]
         )
-        return code == 0
+        if code == 0:
+            self.last_error = ""
+            return True
+
+        # 2. Fallback: Nếu không gửi được, thử với quyền root (su) cho LDPlayer / giả lập bật Root
+        code_su, out_su = self.run_cmd(
+            ["-s", self.active_serial, "shell", "su", "0", "input", "tap", str(tap_x), str(tap_y)]
+        )
+        if code_su == 0:
+            self.last_error = ""
+            return True
+
+        # 3. Fallback 2: Thử su -c
+        code_su2, out_su2 = self.run_cmd(
+            ["-s", self.active_serial, "shell", f"su -c 'input tap {tap_x} {tap_y}'"]
+        )
+        if code_su2 == 0:
+            self.last_error = ""
+            return True
+
+        self.last_error = out or out_su or out_su2 or "Không nhận được phản hồi từ ADB"
+        return False
 
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int = 300) -> bool:
         """Thực hiện vuốt ngầm (swipe) từ (x1, y1) tới (x2, y2)."""
         if not self.active_serial:
+            self.last_error = "Chưa kết nối thiết bị ADB"
             return False
 
-        code, _ = self.run_cmd(
+        code, out = self.run_cmd(
             [
                 "-s",
                 self.active_serial,
@@ -324,4 +384,30 @@ class ADBManager:
                 str(int(duration_ms)),
             ]
         )
-        return code == 0
+        if code == 0:
+            self.last_error = ""
+            return True
+
+        # Fallback qua su
+        code_su, out_su = self.run_cmd(
+            [
+                "-s",
+                self.active_serial,
+                "shell",
+                "su",
+                "0",
+                "input",
+                "swipe",
+                str(int(x1)),
+                str(int(y1)),
+                str(int(x2)),
+                str(int(y2)),
+                str(int(duration_ms)),
+            ]
+        )
+        if code_su == 0:
+            self.last_error = ""
+            return True
+
+        self.last_error = out or out_su or "Không nhận được phản hồi từ ADB"
+        return False

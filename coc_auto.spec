@@ -13,6 +13,7 @@ a = Analysis(
     datas=[
         ('binaries/adb.exe', 'binaries'),
         ('binaries/AdbWinApi.dll', 'binaries'),
+        ('binaries/AdbWinUsbApi.dll', 'binaries'),
         ('assets', 'assets'),
         ('assets.py', '.'),
         ('config.py', '.'),

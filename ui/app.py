@@ -726,7 +726,13 @@ class AutoApp(ctk.CTk):
             if ok:
                 self.log(f"✅ [THÀNH CÔNG] Đã chạm ngầm vào game (Android: {ax}, {ay})! Chuột không di chuyển.")
             else:
-                self.log("❌ Lệnh chạm không gửi được. Lưu ý: LDPlayer cần chọn 'Open remote connection' (Mở kết nối từ xa) & Bật Root trong Cài đặt!")
+                err_detail = f" [Chi tiết ADB: {self.adb.last_error}]" if self.adb.last_error else ""
+                self.log(f"❌ Lệnh chạm không gửi được.{err_detail}")
+                self.log("💡 Các bước kiểm tra LDPlayer:\n"
+                         "  1. Cài đặt khác -> Gỡ lỗi ADB: chọn 'Mở kết nối cục bộ' (Open local connection).\n"
+                         "  2. Cài đặt khác -> Quyền root: BẬT.\n"
+                         "  3. BẮT BUỘC: Bấm 'Lưu cài đặt' và chọn 'Khởi động lại ngay' (Restart emulator).\n"
+                         "  4. Nhìn vào màn hình LDPlayer xem có hiện popup 'Cho phép gỡ lỗi USB' (RSA key), tích Luôn cho phép -> OK.")
 
         threading.Thread(target=_worker, daemon=True).start()
 

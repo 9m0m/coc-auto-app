@@ -784,8 +784,12 @@ def run_fishing_loop(
                         c_start, c_end = yellow_range
                         c_center = (c_start + c_end) / 2
                         l_center = (l_start + l_end) / 2
-                        if abs(c_center - l_center) < 30:
+                        if abs(c_center - l_center) < 45:
                             locked_yellow = (min(l_start, c_start), max(l_end, c_end))
+                            l_start, l_end = locked_yellow
+                        else:
+                            # Nếu ô vàng đã di chuyển sang vị trí mới (cá hiếm đổi chiều)
+                            locked_yellow = (c_start, c_end)
                             l_start, l_end = locked_yellow
 
                     y_width = l_end - l_start
@@ -793,7 +797,8 @@ def run_fishing_loop(
                     if bobber_x is not None:
                         inside = (l_start <= bobber_x <= l_end)
 
-                        if prev_bobber_x is not None and abs(bobber_x - prev_bobber_x) <= 35:
+                        # Tăng tolerance di chuyển phao lên 85px để bắt kịp cá hiếm/huyền thoại bơi tốc độ cao
+                        if prev_bobber_x is not None and abs(bobber_x - prev_bobber_x) <= 85:
                             move_min = min(prev_bobber_x, bobber_x)
                             move_max = max(prev_bobber_x, bobber_x)
                             crossed = max(move_min, l_start) <= min(move_max, l_end)
