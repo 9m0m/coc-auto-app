@@ -304,55 +304,24 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, joined_any
 
-    # 2. Type D: Bảng mỏ vàng phe ta / ô đất / cồn cát bị chọn (có nút [X] ở đáy khi xuất hiện thanh phòng thủ hoặc bảng chi tiết)
-    crop_green_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.74), int(gw_w * 0.15):int(gw_w * 0.85)]
-    hsv_bar = cv2.cvtColor(crop_green_bar, cv2.COLOR_BGR2HSV)
-    green_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (35, 100, 100), (85, 255, 255))))
-
-    crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
-    w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
-    x_white_px = int(np.count_nonzero(w_x_mask))
-
-    banner_crop = screen_crop[int(gw_h * 0.76):int(gw_h * 0.81), int(gw_w * 0.20):int(gw_w * 0.80)]
-    banner_mean = float(np.mean(banner_crop)) if banner_crop.size > 0 else 0.0
-
-    pill_crop = screen_crop[int(gw_h * 0.63):int(gw_h * 0.68), int(gw_w * 0.03):int(gw_w * 0.35)]
-    pill_mean = float(np.mean(pill_crop)) if pill_crop.size > 0 else 255.0
-
-    is_tile_sheet = (x_white_px > 300) and (green_bar_px > 1500 or banner_mean > 175.0 or pill_mean < 80.0)
-
-    if is_tile_sheet:
-        close_x = int(gw_l + gw_w * 0.50)
-        close_y = int(gw_t + gw_h * 0.955)
-        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
-        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
-        if _last_clicked_tile is not None:
-            cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
-            _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
-            if log_cb:
-                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất/tài nguyên -> Bỏ qua {int(cooldown)}s")
-        _last_clicked_tile = None
-        return True, False
-
-    # 3. Type B & C & "Ảo Ảnh": Có nút Back thực sự ở góc trái
+    # 2. Type B & C & Single Rally & "Ảo Ảnh": Có nút Back thực sự ở góc trái
     back_x = int(gw_l + gw_w * config.RALLY_POPUP_BACK_X)
     back_y = int(gw_t + gw_h * config.RALLY_POPUP_BACK_Y)
-    crop_back = screen_crop[max(0, int(gw_h * 0.90)):min(gw_h, int(gw_h * 0.97)), max(0, int(gw_w * 0.04)):min(gw_w, int(gw_w * 0.14))]
-    w_mask = (crop_back[:, :, 0] > 180) & (crop_back[:, :, 1] > 180) & (crop_back[:, :, 2] > 180)
-    white_px = int(np.count_nonzero(w_mask))
-    mean_val = np.mean(crop_back) if crop_back.size > 0 else 255.0
-    # Nút Back thật: Nút tròn màu tím/xám đậm (mean < 140) mang mũi tên trắng rõ nét (200 <= white_px <= 2500), loại trừ 100% Mapview
-    has_back_btn = (200 <= white_px <= 2500 and mean_val < 140.0)
+    crop_back = screen_crop[max(0, int(gw_h * 0.88)):min(gw_h, int(gw_h * 0.98)), max(0, int(gw_w * 0.04)):min(gw_w, int(gw_w * 0.18))]
+    hsv_back = cv2.cvtColor(crop_back, cv2.COLOR_BGR2HSV)
+    purple_px = int(np.count_nonzero(cv2.inRange(hsv_back, (110, 30, 40), (160, 255, 255))))
+    white_px = int(np.count_nonzero(cv2.inRange(hsv_back, (0, 0, 180), (180, 50, 255))))
+    has_back_btn = (purple_px >= 30 and white_px >= 50)
 
     if has_back_btn:
-        bx1, bx2 = int(gw_w * 0.52), int(gw_w * 0.92)
-        by1, by2 = int(gw_h * 0.88), int(gw_h * 0.97)
+        bx1, bx2 = int(gw_w * 0.20), int(gw_w * 0.95)
+        by1, by2 = int(gw_h * 0.88), int(gw_h * 0.98)
         btn_crop = screen_crop[by1:by2, bx1:bx2]
         hsv_btn = cv2.cvtColor(btn_crop, cv2.COLOR_BGR2HSV)
 
         yellow_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (15, 100, 100), (35, 255, 255))))
         green_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (35, 100, 100), (85, 255, 255))))
-        grey_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (0, 0, 100), (180, 40, 210))))
+        grey_px = int(np.count_nonzero(cv2.inRange(hsv_btn, (0, 0, 80), (180, 40, 210))))
 
         if yellow_px > 2500:
             if _last_clicked_tile is not None:
@@ -377,12 +346,13 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
             _last_clicked_tile = None
             return True, True
 
-        if grey_px > 2000:
+        if grey_px > 1000:
             if _last_clicked_tile is not None:
-                _full_tiles_cooldown[_last_clicked_tile] = time.time() + config.RALLY_FULL_TILE_COOLDOWN
+                cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+                _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
                 if log_cb:
-                    log_cb(f"Rally lẻ tại ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(config.RALLY_FULL_TILE_COOLDOWN)}s")
-            _adb_tap(adb, vp, back_x, back_y, "Back về Map", log_cb)
+                    log_cb(f"Rally tại ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đang chờ chấp thuận / đã đầy -> Bấm Back về Map")
+            _adb_tap(adb, vp, back_x, back_y, "Bấm Back về Map", log_cb)
             _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
             _last_clicked_tile = None
             return True, False
@@ -395,6 +365,39 @@ def _handle_rally_detail_popup(sct: mss.MSS, vp: Tuple[int, int, int, int], adb:
                 log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) không có Rally -> Bỏ qua {int(cooldown)}s")
         _adb_tap(adb, vp, back_x, back_y, "Đóng bảng Ảo Ảnh/Cứ điểm về Map", log_cb)
         _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        _last_clicked_tile = None
+        return True, False
+
+    # 3. Type D: Bảng mỏ vàng phe ta / ô đất / cồn cát bị chọn (có nút [X] ở đáy khi xuất hiện thanh phòng thủ hoặc bảng chi tiết)
+    crop_defense_bar = screen_crop[int(gw_h * 0.66):int(gw_h * 0.74), int(gw_w * 0.15):int(gw_w * 0.85)]
+    hsv_bar = cv2.cvtColor(crop_defense_bar, cv2.COLOR_BGR2HSV)
+    green_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (35, 100, 100), (85, 255, 255))))
+    red_bar_px = int(np.count_nonzero(cv2.inRange(hsv_bar, (0, 100, 100), (15, 255, 255))) +
+                     np.count_nonzero(cv2.inRange(hsv_bar, (165, 100, 100), (180, 255, 255))))
+    has_defense_bar = (green_bar_px > 1000 or red_bar_px > 1000)
+
+    crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
+    w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
+    x_white_px = int(np.count_nonzero(w_x_mask))
+
+    banner_crop = screen_crop[int(gw_h * 0.76):int(gw_h * 0.81), int(gw_w * 0.20):int(gw_w * 0.80)]
+    banner_mean = float(np.mean(banner_crop)) if banner_crop.size > 0 else 0.0
+
+    pill_crop = screen_crop[int(gw_h * 0.63):int(gw_h * 0.68), int(gw_w * 0.03):int(gw_w * 0.35)]
+    pill_mean = float(np.mean(pill_crop)) if pill_crop.size > 0 else 255.0
+
+    is_tile_sheet = (x_white_px > 100) and (has_defense_bar or (banner_mean > 175.0 or pill_mean < 80.0))
+
+    if is_tile_sheet:
+        close_x = int(gw_l + gw_w * 0.50)
+        close_y = int(gw_t + gw_h * 0.955)
+        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
+        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        if _last_clicked_tile is not None:
+            cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+            _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+            if log_cb:
+                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất/tài nguyên -> Bỏ qua {int(cooldown)}s")
         _last_clicked_tile = None
         return True, False
 
