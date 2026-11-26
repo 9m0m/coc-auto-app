@@ -826,9 +826,31 @@ def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
     return purple_ratio >= float(getattr(config, "RALLY_CHAT_TAB_PURPLE_RATIO", 0.28))
 
 
+def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
+    """
+    Xác nhận phía trên nút xanh có phần thẻ Rally màu tím ('Tôi đã bắt đầu Tổng Tấn Công!').
+    Loại bỏ 100% bong bóng tin nhắn màu xanh lá do người dùng/đồng đội tự chat.
+    """
+    if screen_crop is None or screen_crop.size == 0:
+        return False
+    gh, gw = screen_crop.shape[:2]
+    py1 = max(0, min(gh - 1, int(btn_y - gh * 0.11)))
+    py2 = max(py1 + 1, min(gh, int(btn_y - gh * 0.02)))
+    px1 = max(0, min(gw - 1, int(gw * 0.30)))
+    px2 = max(px1 + 1, min(gw, int(gw * 0.58)))
+    roi = screen_crop[py1:py2, px1:px2]
+    if roi.size == 0:
+        return False
+    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    purple_mask = cv2.inRange(hsv_roi, np.array([120, 60, 80], dtype=np.uint8), np.array([155, 255, 255], dtype=np.uint8))
+    purple_ratio = float(np.count_nonzero(purple_mask)) / float(max(1, roi.shape[0] * roi.shape[1]))
+    return purple_ratio >= float(getattr(config, "RALLY_CHAT_CARD_PURPLE_MIN_RATIO", 0.12))
+
+
 def _find_chat_join_buttons(screen_crop: np.ndarray) -> List[Tuple[int, int]]:
     """
     Tìm toàn bộ nút 'Tham gia' màu xanh lá nằm ngang trong vùng tin nhắn Chat.
+    Lọc Hue >= 39 và bắt buộc có phần thẻ Rally tím phía trên để loại bỏ bong bóng chat xanh của người dùng.
     Sắp xếp từ DƯỚI lên TRÊN để ưu tiên Rally mới nhất trước.
     """
     if screen_crop is None or screen_crop.size == 0:
@@ -844,21 +866,24 @@ def _find_chat_join_buttons(screen_crop: np.ndarray) -> List[Tuple[int, int]]:
         return []
 
     hsv = cv2.cvtColor(msg_crop, cv2.COLOR_BGR2HSV)
-    lower_g = np.array(getattr(config, "HSV_RALLY_GREEN_LOWER", [35, 70, 70]), dtype=np.uint8)
-    upper_g = np.array(getattr(config, "HSV_RALLY_GREEN_UPPER", [85, 255, 255]), dtype=np.uint8)
+    lower_g = np.array(getattr(config, "HSV_CHAT_JOIN_GREEN_LOWER", [39, 70, 70]), dtype=np.uint8)
+    upper_g = np.array(getattr(config, "HSV_CHAT_JOIN_GREEN_UPPER", [85, 255, 255]), dtype=np.uint8)
     green_mask = cv2.inRange(hsv, lower_g, upper_g)
     contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     min_w = max(40, int(gw * getattr(config, "RALLY_CHAT_BTN_MIN_W_RATIO", 0.250)))
     min_h = max(12, int(gh * getattr(config, "RALLY_CHAT_BTN_MIN_H_RATIO", 0.015)))
-    max_h = max(35, int(gh * getattr(config, "RALLY_CHAT_BTN_MAX_H_RATIO", 0.085)))
+    max_h = max(35, int(gh * getattr(config, "RALLY_CHAT_BTN_MAX_H_RATIO", 0.065)))
     min_aspect = float(getattr(config, "RALLY_CHAT_BTN_MIN_ASPECT", 2.5))
 
     buttons: List[Tuple[int, int]] = []
     for c in contours:
         cx, cy, bw, bh = cv2.boundingRect(c)
         if bw >= min_w and min_h <= bh <= max_h and (float(bw) / float(max(1, bh))) >= min_aspect:
-            buttons.append((int(x1 + cx + bw // 2), int(y1 + cy + bh // 2)))
+            btn_cx = int(x1 + cx + bw // 2)
+            btn_cy = int(y1 + cy + bh // 2)
+            if _has_purple_rally_card_above(screen_crop, btn_cy):
+                buttons.append((btn_cx, btn_cy))
 
     # Ưu tiên bấm Rally mới nhất ở dưới cùng trước
     buttons.sort(key=lambda pt: pt[1], reverse=True)

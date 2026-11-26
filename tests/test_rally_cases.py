@@ -607,8 +607,9 @@ class TestRallyCases(unittest.TestCase):
         # Tab Liên Minh bên trái
         if lien_minh_active:
             frame[int(self.gw_h * 0.08):int(self.gw_h * 0.18), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
-        # Nút Tham gia màu xanh lá dạng thanh ngang dài trong thẻ Rally
+        # Nút Tham gia màu xanh lá dạng thanh ngang dài trong thẻ Rally + ô tím đặc trưng phía trên
         if include_green_btn:
+            frame[int(self.gw_h * 0.61):int(self.gw_h * 0.68), int(self.gw_w * 0.30):int(self.gw_w * 0.52)] = (200, 80, 160)
             by1, by2 = int(self.gw_h * 0.69), int(self.gw_h * 0.735)
             bx1, bx2 = int(self.gw_w * 0.34), int(self.gw_w * 0.84)
             frame[by1:by2, bx1:bx2] = (35, 200, 50)
@@ -818,6 +819,26 @@ class TestRallyCases(unittest.TestCase):
             rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
         self.assertEqual(len(self.mock_adb.taps), 1)
         self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, config.RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2, delta=0.02)
+
+    def test_case_21_ignore_user_green_chat_bubbles(self):
+        """Bong bóng chat màu xanh nõn chuối của người dùng (dài hoặc ngắn) không bao giờ bị nhầm là nút Tham gia."""
+        # 1. Bong bóng chat dài đúng màu xanh nõn chuối thực tế BGR (22, 232, 195)
+        chat_user_msg = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        chat_user_msg[int(self.gw_h * 0.62):int(self.gw_h * 0.665), int(self.gw_w * 0.34):int(self.gw_w * 0.86)] = (22, 232, 195)
+        self.assertEqual(rally._find_chat_join_buttons(chat_user_msg), [])
+
+        # 2. Kể cả bong bóng cùng màu xanh ngọc (35, 200, 50) nhưng KHÔNG có thẻ Rally tím phía trên -> vẫn phải bỏ qua
+        chat_plain_green = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        chat_plain_green[int(self.gw_h * 0.62):int(self.gw_h * 0.665), int(self.gw_w * 0.34):int(self.gw_w * 0.86)] = (35, 200, 50)
+        self.assertEqual(rally._find_chat_join_buttons(chat_plain_green), [])
+
+        # 3. Nếu bên dưới có thẻ Rally thật (có ô tím phía trên) thì vẫn bắt đúng thẻ Rally, bỏ qua bong bóng chat ở trên
+        chat_mixed = chat_user_msg.copy()
+        chat_mixed[int(self.gw_h * 0.68):int(self.gw_h * 0.75), int(self.gw_w * 0.30):int(self.gw_w * 0.52)] = (200, 80, 160)
+        chat_mixed[int(self.gw_h * 0.76):int(self.gw_h * 0.805), int(self.gw_w * 0.34):int(self.gw_w * 0.84)] = (35, 200, 50)
+        btns = rally._find_chat_join_buttons(chat_mixed)
+        self.assertEqual(len(btns), 1)
+        self.assertAlmostEqual(btns[0][1] / self.gw_h, 0.782, delta=0.03)
 
 
 if __name__ == "__main__":

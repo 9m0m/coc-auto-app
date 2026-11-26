@@ -181,11 +181,14 @@ CHAT_MESSAGES_REL_X_MAX: float = 0.900
 CHAT_MESSAGES_REL_Y_MIN: float = 0.140
 CHAT_MESSAGES_REL_Y_MAX: float = 0.820
 
-# Lọc hình học nút "Tham gia" nằm ngang trong Chat (loại nút Gửi hình tròn & icon nhỏ)
+# Lọc hình học nút "Tham gia" nằm ngang trong Chat (loại nút Gửi hình tròn, icon nhỏ & bong bóng chat xanh nõn chuối)
+HSV_CHAT_JOIN_GREEN_LOWER = [39, 70, 70]
+HSV_CHAT_JOIN_GREEN_UPPER = [85, 255, 255]
 RALLY_CHAT_BTN_MIN_W_RATIO: float = 0.250
 RALLY_CHAT_BTN_MIN_H_RATIO: float = 0.015
-RALLY_CHAT_BTN_MAX_H_RATIO: float = 0.085
+RALLY_CHAT_BTN_MAX_H_RATIO: float = 0.065
 RALLY_CHAT_BTN_MIN_ASPECT: float = 2.5
+RALLY_CHAT_CARD_PURPLE_MIN_RATIO: float = 0.12
 
 # Thông số vuốt chống trôi tin nhắn trong Chat (Vuốt lên xem tin cũ -> Vuốt xuống về đáy)
 RALLY_CHAT_SWIPE_X: float = 0.560
