@@ -925,6 +925,42 @@ class TestRallyCases(unittest.TestCase):
         self.assertAlmostEqual(self.mock_adb.taps[0][0] / self.gw_w, 0.50, delta=0.04)
         self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.945, delta=0.03)
 
+    def test_case_24_dune_strict_territory_popup_escape_and_no_mapview_x(self):
+        """Chế độ Dune (allow_type_d_close_x=False): Tự thoát bảng Đồng Bằng/ô đất che nút Chat nhưng KHÔNG bấm nhầm Mapview."""
+        # 1. Bảng Đồng Bằng chuẩn (nền thẻ tím trắng S<45,V>180 >= 0.35 + thanh tiêu đề tối Y=0.64..0.72 + nút [X] đậm)
+        terr_frame = self._create_blank_frame()
+        terr_frame[int(self.gw_h * 0.64):int(self.gw_h * 0.72), :] = (40, 35, 50)
+        terr_frame[int(self.gw_h * 0.72):int(self.gw_h * 0.91), :] = (242, 232, 236)
+        terr_frame[int(self.gw_h * 0.91):self.gw_h, :] = (35, 25, 30)
+        terr_frame[int(self.gw_h * 0.935):int(self.gw_h * 0.97), int(self.gw_w * 0.46):int(self.gw_w * 0.54)] = (250, 250, 250)
+
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(terr_frame)):
+            is_pop, is_join = rally._handle_rally_detail_popup(
+                None, self.vp, self.mock_adb, self.stop_event, allow_type_d_close_x=False
+            )
+        self.assertTrue(is_pop, "Bảng Đồng Bằng che nút Chat phải được tự thoát về Mapview")
+        self.assertFalse(is_join)
+        self.assertEqual(len(self.mock_adb.taps), 1)
+        self.assertAlmostEqual(self.mock_adb.taps[0][0] / self.gw_w, 0.50, delta=0.04)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.955, delta=0.03)
+
+        # 2. Kiểm tra trực tiếp ảnh thật 6dce13a3 (bảng Đồng Bằng bị kẹt) -> phải thoát được
+        local_6d = r"C:\Users\ADMIN\.gemini\antigravity\brain\e2ec6a35-0667-4364-bb2e-744655c2954d\.user_uploaded\media_1795690499801_6dce13a3.jpg"
+        if os.path.exists(local_6d):
+            raw_6d = cv2.imread(local_6d)
+            img_6d = raw_6d[31:, 15:raw_6d.shape[1] - 36]
+            h6, w6 = img_6d.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (w6, h6)
+            with patch("modules.rally.safe_grab", side_effect=make_mock_grab(img_6d)):
+                is_p6, is_j6 = rally._handle_rally_detail_popup(
+                    None, (0, 0, w6, h6), self.mock_adb, self.stop_event, allow_type_d_close_x=False
+                )
+            self.assertTrue(is_p6)
+            self.assertFalse(is_j6)
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][1] / h6, 0.955, delta=0.03)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

@@ -478,26 +478,44 @@ def _handle_rally_detail_popup(
         _last_clicked_tile = None
         return True, False
 
-    # 4. Type D: Bảng mỏ vàng phe ta / ô đất đồng minh / lane địch không thể đánh (có nút [X] ở đáy, KHÔNG có nút Back tím)
-    # Tắt hoàn toàn nhánh này khi chạy chế độ Dune Chat (allow_type_d_close_x=False) để không bao giờ bấm nhầm nút [X] thoát Mapview.
-    if allow_type_d_close_x:
-        crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
-        w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
-        tot_x = max(1, crop_close_x.shape[0] * crop_close_x.shape[1])
-        x_ratio = float(np.count_nonzero(w_x_mask)) / float(tot_x)
+    # 4. Type D: Bảng mỏ vàng phe ta / ô đất đồng minh / Đồng Bằng (có nút [X] ở đáy, KHÔNG có nút Back tím)
+    crop_close_x = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.44):int(gw_w * 0.56)]
+    w_x_mask = (crop_close_x[:, :, 0] > 180) & (crop_close_x[:, :, 1] > 180) & (crop_close_x[:, :, 2] > 180)
+    tot_x = max(1, crop_close_x.shape[0] * crop_close_x.shape[1])
+    x_ratio = float(np.count_nonzero(w_x_mask)) / float(tot_x)
 
-        if x_ratio >= 0.04:
-            close_x = int(gw_l + gw_w * 0.50)
-            close_y = int(gw_t + gw_h * 0.955)
-            _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
-            _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
-            if _last_clicked_tile is not None:
-                cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
-                _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
-                if log_cb:
-                    log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất/tài nguyên -> Bỏ qua {int(cooldown)}s")
-            _last_clicked_tile = None
-            return True, False
+    # Ở chế độ Dune (allow_type_d_close_x=False), chỉ được đóng [X] khi KHỚP CHẶT cả 4 dấu hiệu bảng ô đất
+    # che nút Chat: nền thẻ sáng S<45,V>180 >= 0.35 + thanh tiêu đề tối >= 0.35 + dải đáy hai bên [X] tối < 115 + nút [X] trắng đậm >= 0.22.
+    can_close_strict_territory = False
+    if not allow_type_d_close_x and x_ratio >= 0.22:
+        lav180_ratio = float(np.count_nonzero((hsv_bg[:, :, 1] < 45) & (hsv_bg[:, :, 2] > 180))) / float(
+            max(1, roi_card_bg.shape[0] * roi_card_bg.shape[1])
+        )
+        tb_low = cv2.cvtColor(screen_crop[int(gw_h * 0.64):int(gw_h * 0.72), int(gw_w * 0.05):int(gw_w * 0.35)], cv2.COLOR_BGR2GRAY)
+        tb_high = cv2.cvtColor(screen_crop[int(gw_h * 0.50):int(gw_h * 0.60), int(gw_w * 0.05):int(gw_w * 0.35)], cv2.COLOR_BGR2GRAY)
+        tb_dark_low = float(np.count_nonzero(tb_low < 80)) / float(max(1, tb_low.size))
+        tb_dark_high = float(np.count_nonzero(tb_high < 80)) / float(max(1, tb_high.size))
+        foot_l = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.10):int(gw_w * 0.38)]
+        foot_r = screen_crop[int(gw_h * 0.925):int(gw_h * 0.980), int(gw_w * 0.62):int(gw_w * 0.90)]
+        has_dark_x_footer = (
+            foot_l.size > 0 and foot_r.size > 0
+            and float(np.mean(foot_l)) < 115.0
+            and float(np.mean(foot_r)) < 115.0
+        )
+        can_close_strict_territory = (lav180_ratio >= 0.35 and max(tb_dark_low, tb_dark_high) >= 0.35 and has_dark_x_footer)
+
+    if (allow_type_d_close_x and x_ratio >= 0.04) or can_close_strict_territory:
+        close_x = int(gw_l + gw_w * 0.50)
+        close_y = int(gw_t + gw_h * 0.955)
+        _adb_tap(adb, vp, close_x, close_y, "Đóng bảng ô đất / tài nguyên (Nút X)", log_cb)
+        _sleep(config.RALLY_DELAY_AFTER_BACK_CLICK, stop_event)
+        if _last_clicked_tile is not None:
+            cooldown = getattr(config, "RALLY_FULL_TILE_COOLDOWN", 30.0)
+            _full_tiles_cooldown[_last_clicked_tile] = time.time() + cooldown
+            if log_cb:
+                log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) là ô đất/tài nguyên -> Bỏ qua {int(cooldown)}s")
+        _last_clicked_tile = None
+        return True, False
 
     return False, False
 
@@ -1053,11 +1071,13 @@ def _tap_chat_join_and_handle_popup(
             _chat_failed_y_cooldown[y_bucket] = time.time() + float(getattr(config, "RALLY_DUNE_TAP_COOLDOWN", 8.0))
         return "POPUP_HANDLED"
 
-    # Nếu không bật popup (rally vừa hết hạn hoặc lag) -> kiểm tra còn ở Chat hay đã nhảy ra Map
+    # Nếu không bật popup (rally vừa hết hạn hoặc lag) -> chỉ thoát popup nếu thật sự xuất hiện muộn;
+    # KHÔNG tap mù vào (0.50, 0.20) trên Map để tránh tự bấm trúng ô đất sinh ra popup Đồng Bằng!
     after_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
     if after_frame is not None and not _is_chat_open(after_frame):
-        _adb_tap(adb, vp, int(gw_l + gw_w * 0.50), int(gw_t + gw_h * 0.20), "Bỏ chọn ô đất (Tự giải thoát)", log_cb)
-        _sleep(0.30, stop_event)
+        is_pop_late, is_join_late = _handle_rally_detail_popup(sct, vp, adb, stop_event, log_cb, allow_type_d_close_x=False)
+        if is_pop_late:
+            return "JOINED" if is_join_late else "POPUP_HANDLED"
     else:
         _chat_failed_y_cooldown[y_bucket] = time.time() + float(getattr(config, "RALLY_DUNE_TAP_COOLDOWN", 8.0))
     return "NO_POPUP"
