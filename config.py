@@ -159,6 +159,7 @@ RALLY_CHAT_WORLD_CYAN_RATIO: float = 0.05
 RALLY_CHAT_WORLD_MAX_GOLD_RATIO: float = 0.03
 RALLY_CHAT_TAB_MATCH_THRESHOLD: float = 0.68
 RALLY_CHAT_TAB_REF_HEIGHT: float = 715.0
+RALLY_CHAT_TAB_SCAN_Y_MAX: float = 0.850
 
 # Tọa độ khoảng trống phía trên đỉnh khung Chat để đóng Chat an toàn (tránh xa nút [X] ở đáy Y=0.955)
 RALLY_CHAT_CLOSE_X: float = 0.500

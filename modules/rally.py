@@ -796,88 +796,61 @@ def _is_chat_open(screen_crop: np.ndarray) -> bool:
     return light_ratio >= float(getattr(config, "RALLY_CHAT_BODY_LIGHT_RATIO", 0.42))
 
 
-def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Tuple[float, float, float]:
+def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Optional[Tuple[float, float, float]]:
     """
-    Xác định vị trí tab 'Liên Minh' bên trái khung Chat bằng nhận diện icon khiên vàng (bất kể bị
-    tab Thế Giới, tradecard hay tin nhắn người lạ đẩy xuống slot 2, 3, 4...).
-    Fallback kiểm tra tab Thế Giới slot 1 nếu không dùng template thật.
-    Trả về: (y_min_rel, y_max_rel, click_y_rel).
+    Xác định chính xác vị trí tab 'Liên Minh' bên trái khung Chat bằng nhận diện icon khiên vàng
+    trên toàn sidebar (Y: 0.06..0.85, bao gồm cả slot 1..6 khi bị Thế Giới / tradecard / người lạ đẩy xuống).
+    Trả về None nếu không khớp chắc chắn icon khiên vàng — TUYỆT ĐỐI không đoán mù slot 1/2.
     """
-    y1_rel = float(getattr(config, "RALLY_CHAT_TAB_REL_Y_MIN", 0.070))
-    y2_rel = float(getattr(config, "RALLY_CHAT_TAB_REL_Y_MAX", 0.180))
-    click_y1 = float(getattr(config, "RALLY_CHAT_LIEN_MINH_TAB_Y", 0.119))
-
     if screen_crop is None or screen_crop.size == 0:
-        return y1_rel, y2_rel, click_y1
+        return None
+
+    shield_tpl = assets.get_lien_minh_tab_template()
+    if shield_tpl is None or shield_tpl.size == 0:
+        return None
 
     gh, gw = screen_crop.shape[:2]
+    sb_y1 = max(0, int(gh * 0.06))
+    sb_y2 = max(sb_y1 + 10, int(gh * float(getattr(config, "RALLY_CHAT_TAB_SCAN_Y_MAX", 0.850))))
+    sb_x2 = max(10, int(gw * 0.21))
+    sidebar = screen_crop[sb_y1:sb_y2, 0:sb_x2]
+    if sidebar.size == 0:
+        return None
 
-    # 1. Nhận diện chính xác icon khiên vàng 'Liên Minh' trên toàn bộ cột sidebar trái (Y: 0.06..0.72)
-    shield_tpl = assets.get_lien_minh_tab_template()
-    if shield_tpl is not None and shield_tpl.size > 0:
-        sb_y1 = max(0, int(gh * 0.06))
-        sb_y2 = max(sb_y1 + 10, int(gh * 0.72))
-        sb_x2 = max(10, int(gw * 0.21))
-        sidebar = screen_crop[sb_y1:sb_y2, 0:sb_x2]
-        if sidebar.size > 0:
-            ref_h = float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
-            base_sc = float(gh) / ref_h if ref_h > 0 else 1.0
-            match_thresh = float(getattr(config, "RALLY_CHAT_TAB_MATCH_THRESHOLD", 0.68))
-            best_score = 0.0
-            best_cy_px = 0
-            tpl_h, tpl_w = shield_tpl.shape[:2]
-            for mult in (0.85, 0.95, 1.00, 1.05, 1.15, 1.30):
-                cur_sc = base_sc * mult
-                cur_tw = max(8, int(tpl_w * cur_sc))
-                cur_th = max(8, int(tpl_h * cur_sc))
-                if cur_tw >= sidebar.shape[1] or cur_th >= sidebar.shape[0]:
-                    continue
-                scaled = cv2.resize(
-                    shield_tpl,
-                    (cur_tw, cur_th),
-                    interpolation=cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR,
-                )
-                res = cv2.matchTemplate(sidebar, scaled, cv2.TM_CCOEFF_NORMED)
-                _, max_v, _, max_l = cv2.minMaxLoc(res)
-                if max_v > best_score:
-                    best_score = float(max_v)
-                    best_cy_px = int(sb_y1 + max_l[1] + cur_th // 2)
-
-            if best_score >= match_thresh and best_cy_px > 0:
-                cy_rel = float(best_cy_px) / float(max(1, gh))
-                return max(0.05, cy_rel - 0.055), min(0.80, cy_rel + 0.055), cy_rel
-
-    # 2. Fallback (cho test giả lập không gắn icon thật): kiểm tra quả địa cầu Thế Giới ở slot 1
-    x1 = max(0, min(gw - 1, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MIN", 0.030))))
-    x2 = max(x1 + 1, min(gw, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MAX", 0.180))))
-    sy1 = max(0, min(gh - 1, int(gh * y1_rel)))
-    sy2 = max(sy1 + 1, min(gh, int(gh * y2_rel)))
-    slot1 = screen_crop[sy1:sy2, x1:x2]
-    if slot1.size == 0:
-        return y1_rel, y2_rel, click_y1
-
-    hsv1 = cv2.cvtColor(slot1, cv2.COLOR_BGR2HSV)
-    tot = float(max(1, slot1.shape[0] * slot1.shape[1]))
-    cyan_ratio = float(np.count_nonzero(cv2.inRange(hsv1, np.array([85, 90, 90], dtype=np.uint8), np.array([115, 255, 255], dtype=np.uint8)))) / tot
-    gold_ratio = float(np.count_nonzero(cv2.inRange(hsv1, np.array([16, 120, 140], dtype=np.uint8), np.array([32, 255, 255], dtype=np.uint8)))) / tot
-
-    min_cyan = float(getattr(config, "RALLY_CHAT_WORLD_CYAN_RATIO", 0.05))
-    max_gold = float(getattr(config, "RALLY_CHAT_WORLD_MAX_GOLD_RATIO", 0.03))
-    if cyan_ratio >= min_cyan and gold_ratio <= max_gold:
-        return (
-            float(getattr(config, "RALLY_CHAT_TAB2_REL_Y_MIN", 0.190)),
-            float(getattr(config, "RALLY_CHAT_TAB2_REL_Y_MAX", 0.300)),
-            float(getattr(config, "RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2", 0.245)),
+    ref_h = float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
+    base_sc = float(gh) / ref_h if ref_h > 0 else 1.0
+    match_thresh = float(getattr(config, "RALLY_CHAT_TAB_MATCH_THRESHOLD", 0.68))
+    best_score = 0.0
+    best_cy_px = 0
+    tpl_h, tpl_w = shield_tpl.shape[:2]
+    for mult in (0.85, 0.95, 1.00, 1.05, 1.15, 1.30):
+        cur_sc = base_sc * mult
+        cur_tw = max(8, int(tpl_w * cur_sc))
+        cur_th = max(8, int(tpl_h * cur_sc))
+        if cur_tw >= sidebar.shape[1] or cur_th >= sidebar.shape[0]:
+            continue
+        scaled = cv2.resize(
+            shield_tpl,
+            (cur_tw, cur_th),
+            interpolation=cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR,
         )
-    return y1_rel, y2_rel, click_y1
+        res = cv2.matchTemplate(sidebar, scaled, cv2.TM_CCOEFF_NORMED)
+        _, max_v, _, max_l = cv2.minMaxLoc(res)
+        if max_v > best_score:
+            best_score = float(max_v)
+            best_cy_px = int(sb_y1 + max_l[1] + cur_th // 2)
+
+    if best_score >= match_thresh and best_cy_px > 0:
+        cy_rel = float(best_cy_px) / float(max(1, gh))
+        return max(0.05, cy_rel - 0.055), min(0.86, cy_rel + 0.055), cy_rel
+    return None
 
 
-def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
-    """Kiểm tra tab 'Liên Minh' (ở slot 1 hoặc slot 2 nếu có tab Thế Giới) có đang được chọn (nền tím) không."""
+def _is_chat_tab_roi_purple(screen_crop: np.ndarray, y1_rel: float, y2_rel: float) -> bool:
+    """Kiểm tra vùng tab trong [y1_rel..y2_rel] trên sidebar trái có đang sáng nền tím không."""
     if screen_crop is None or screen_crop.size == 0:
         return False
     gh, gw = screen_crop.shape[:2]
-    y1_rel, y2_rel, _ = _detect_lien_minh_tab_target_y(screen_crop)
     x1 = max(0, min(gw - 1, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MIN", 0.030))))
     x2 = max(x1 + 1, min(gw, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MAX", 0.180))))
     y1 = max(0, min(gh - 1, int(gh * y1_rel)))
@@ -889,6 +862,14 @@ def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
     purple_mask = cv2.inRange(hsv_tab, np.array([120, 80, 120], dtype=np.uint8), np.array([155, 255, 255], dtype=np.uint8))
     purple_ratio = float(np.count_nonzero(purple_mask)) / float(max(1, tab_roi.shape[0] * tab_roi.shape[1]))
     return purple_ratio >= float(getattr(config, "RALLY_CHAT_TAB_PURPLE_RATIO", 0.28))
+
+
+def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
+    """Kiểm tra tab 'Liên Minh' (khớp icon khiên vàng thật) có đang được chọn (nền tím) không."""
+    bounds = _detect_lien_minh_tab_target_y(screen_crop)
+    if bounds is None:
+        return False
+    return _is_chat_tab_roi_purple(screen_crop, bounds[0], bounds[1])
 
 
 def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
@@ -1104,17 +1085,19 @@ def scan_and_join_chat_rallies(
     if frame is None or not _is_chat_open(frame):
         return "NOT_CHAT"
 
-    # Đảm bảo đang đứng ở tab Liên Minh (hỗ trợ cả slot 1 và slot 2 nếu có tab Thế Giới)
-    if not _is_lien_minh_tab_active(frame):
-        _, _, target_tab_y = _detect_lien_minh_tab_target_y(frame)
-        tab_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_LIEN_MINH_TAB_X", 0.110))
-        tab_y = int(gw_t + gw_h * target_tab_y)
-        _adb_tap(adb, vp, tab_x, tab_y, "Chuyển sang tab Liên Minh", log_cb)
-        if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_TAB_CLICK", 0.75)), stop_event):
-            return "STOPPED"
-        frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
-        if frame is None:
-            return "NONE"
+    # Chỉ chuyển tab sang 'Liên Minh' khi nhận diện CHẮC CHẮN icon chiếc khiên vàng (tuyệt đối không bấm mù slot 1/2)
+    tab_bounds = _detect_lien_minh_tab_target_y(frame)
+    if tab_bounds is not None:
+        y1_rel, y2_rel, target_tab_y = tab_bounds
+        if not _is_chat_tab_roi_purple(frame, y1_rel, y2_rel):
+            tab_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_LIEN_MINH_TAB_X", 0.110))
+            tab_y = int(gw_t + gw_h * target_tab_y)
+            _adb_tap(adb, vp, tab_x, tab_y, "Chuyển sang tab Liên Minh", log_cb)
+            if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_TAB_CLICK", 0.75)), stop_event):
+                return "STOPPED"
+            frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+            if frame is None:
+                return "NONE"
 
     # Nhịp 1: Quét đáy Chat (tin nhắn mới nhất)
     btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(frame), frame, gw_h)

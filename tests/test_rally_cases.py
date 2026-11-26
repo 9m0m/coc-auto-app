@@ -604,9 +604,17 @@ class TestRallyCases(unittest.TestCase):
         # Thanh nhập liệu trắng + Nút Gửi xanh lá ở góc dưới phải
         frame[int(self.gw_h * 0.84):int(self.gw_h * 0.90), int(self.gw_w * 0.20):int(self.gw_w * 0.65)] = (230, 230, 230)
         frame[int(self.gw_h * 0.835):int(self.gw_h * 0.905), int(self.gw_w * 0.76):int(self.gw_w * 0.91)] = (35, 195, 50)
-        # Tab Liên Minh bên trái
+        # Tab Liên Minh bên trái (nền tím + icon khiên vàng chuẩn)
         if lien_minh_active:
             frame[int(self.gw_h * 0.08):int(self.gw_h * 0.18), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
+            shield_tpl = assets.get_lien_minh_tab_template()
+            if shield_tpl is not None:
+                sc = self.gw_h / float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
+                tw, th = max(8, int(shield_tpl.shape[1] * sc)), max(8, int(shield_tpl.shape[0] * sc))
+                scaled_tpl = cv2.resize(shield_tpl, (tw, th))
+                sy = int(self.gw_h * 0.125) - th // 2
+                sx = int(self.gw_w * 0.105) - tw // 2
+                frame[sy:sy + th, sx:sx + tw] = scaled_tpl
         # Nút Tham gia màu xanh lá dạng thanh ngang dài trong thẻ Rally + ô tím đặc trưng phía trên
         if include_green_btn:
             frame[int(self.gw_h * 0.61):int(self.gw_h * 0.68), int(self.gw_w * 0.30):int(self.gw_w * 0.52)] = (200, 80, 160)
@@ -800,25 +808,45 @@ class TestRallyCases(unittest.TestCase):
         self.assertFalse(is_pop_d)
         self.assertEqual(len(self.mock_adb.taps), 0, "Chế độ Dune tuyệt đối không bao giờ bấm Nút X Type D!")
 
-        # 3. Chat có tab Thế Giới (xanh cyan) ở slot 1 (Y=0.07..0.18), Liên Minh ở slot 2 (Y=0.19..0.30)
+        # 3. Chat có tab Thế Giới (xanh cyan) ở slot 1 (Y=0.07..0.18), Liên Minh ở slot 2 (Y=0.19..0.30) có icon khiên vàng
+        shield_tpl = assets.get_lien_minh_tab_template()
+        self.assertIsNotNone(shield_tpl)
+        sc = self.gw_h / float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
+        scaled_shield = cv2.resize(shield_tpl, (max(8, int(shield_tpl.shape[1] * sc)), max(8, int(shield_tpl.shape[0] * sc))))
+        sh_s, sw_s = scaled_shield.shape[:2]
+
         chat_world_tab = self._create_chat_frame(include_green_btn=False, lien_minh_active=False)
         # Vẽ quả địa cầu cyan ở slot 1
         chat_world_tab[int(self.gw_h * 0.09):int(self.gw_h * 0.16), int(self.gw_w * 0.06):int(self.gw_w * 0.14)] = (220, 180, 30)
-        # Vẽ slot 2 màu tím đang active
+        # Vẽ slot 2 màu tím đang active + icon khiên vàng Liên Minh
         chat_world_tab[int(self.gw_h * 0.20):int(self.gw_h * 0.29), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
+        sy2 = int(self.gw_h * config.RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2) - sh_s // 2
+        sx2 = int(self.gw_w * 0.105) - sw_s // 2
+        chat_world_tab[sy2:sy2 + sh_s, sx2:sx2 + sw_s] = scaled_shield
         self.assertTrue(rally._is_lien_minh_tab_active(chat_world_tab))
-        _, _, target_y = rally._detect_lien_minh_tab_target_y(chat_world_tab)
-        self.assertAlmostEqual(target_y, config.RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2, delta=0.01)
+        bounds = rally._detect_lien_minh_tab_target_y(chat_world_tab)
+        self.assertIsNotNone(bounds)
+        self.assertAlmostEqual(bounds[2], config.RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2, delta=0.02)
 
-        # Nếu slot 2 chưa tím -> scan_and_join_chat_rallies phải bấm đúng vào slot 2 (Y ~ 0.245), không bấm nhầm Thế Giới
-        chat_world_inactive = self._create_chat_frame(include_green_btn=False, lien_minh_active=False)
-        chat_world_inactive[int(self.gw_h * 0.09):int(self.gw_h * 0.16), int(self.gw_w * 0.06):int(self.gw_w * 0.14)] = (220, 180, 30)
+        # Nếu slot 2 chưa tím -> scan_and_join_chat_rallies phải bấm đúng vào slot 2 (khiên vàng), không bấm nhầm Thế Giới
+        chat_world_inactive = chat_world_tab.copy()
+        chat_world_inactive[int(self.gw_h * 0.20):int(self.gw_h * 0.29), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (25, 25, 30)
+        chat_world_inactive[sy2:sy2 + sh_s, sx2:sx2 + sw_s] = scaled_shield
         self.assertFalse(rally._is_lien_minh_tab_active(chat_world_inactive))
         self.mock_adb.clear()
         with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_world_inactive)):
             rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
         self.assertEqual(len(self.mock_adb.taps), 1)
         self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, config.RALLY_CHAT_LIEN_MINH_TAB_Y_SLOT2, delta=0.02)
+
+        # 4. Tuyệt đối KHÔNG bấm mù slot 1/2 nếu không thấy icon khiên vàng (VD: quá nhiều tin nhắn lạ đẩy tuột Liên Minh)
+        chat_no_shield = self._create_chat_frame(include_green_btn=False, lien_minh_active=False)
+        chat_no_shield[int(self.gw_h * 0.08):int(self.gw_h * 0.17), int(self.gw_w * 0.05):int(self.gw_w * 0.15)] = (200, 180, 120)
+        self.assertIsNone(rally._detect_lien_minh_tab_target_y(chat_no_shield))
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_no_shield)):
+            rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(len(self.mock_adb.taps), 0, "Không khớp khiên vàng thì tuyệt đối KHÔNG được bấm mù vào slot người lạ!")
 
     def test_case_21_ignore_user_green_chat_bubbles(self):
         """Bong bóng chat màu xanh nõn chuối của người dùng (dài hoặc ngắn) không bao giờ bị nhầm là nút Tham gia."""
