@@ -769,10 +769,9 @@ def _is_chat_open(screen_crop: np.ndarray) -> bool:
 
 def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Tuple[float, float, float]:
     """
-    Xác định vị trí tab 'Liên Minh' bên trái khung Chat:
-    - Nếu slot 1 (Y: 0.07..0.18) là tab 'Thế Giới' (quả địa cầu xanh dương cyan, không có khiên vàng),
-      thì 'Liên Minh' nằm ở slot 2 (Y: 0.19..0.30, tâm 0.245).
-    - Ngược lại 'Liên Minh' nằm ở slot 1 (Y: 0.07..0.18, tâm 0.119).
+    Xác định vị trí tab 'Liên Minh' bên trái khung Chat bằng nhận diện icon khiên vàng (bất kể bị
+    tab Thế Giới, tradecard hay tin nhắn người lạ đẩy xuống slot 2, 3, 4...).
+    Fallback kiểm tra tab Thế Giới slot 1 nếu không dùng template thật.
     Trả về: (y_min_rel, y_max_rel, click_y_rel).
     """
     y1_rel = float(getattr(config, "RALLY_CHAT_TAB_REL_Y_MIN", 0.070))
@@ -783,6 +782,43 @@ def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Tuple[float, floa
         return y1_rel, y2_rel, click_y1
 
     gh, gw = screen_crop.shape[:2]
+
+    # 1. Nhận diện chính xác icon khiên vàng 'Liên Minh' trên toàn bộ cột sidebar trái (Y: 0.06..0.72)
+    shield_tpl = assets.get_lien_minh_tab_template()
+    if shield_tpl is not None and shield_tpl.size > 0:
+        sb_y1 = max(0, int(gh * 0.06))
+        sb_y2 = max(sb_y1 + 10, int(gh * 0.72))
+        sb_x2 = max(10, int(gw * 0.21))
+        sidebar = screen_crop[sb_y1:sb_y2, 0:sb_x2]
+        if sidebar.size > 0:
+            ref_h = float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
+            base_sc = float(gh) / ref_h if ref_h > 0 else 1.0
+            match_thresh = float(getattr(config, "RALLY_CHAT_TAB_MATCH_THRESHOLD", 0.68))
+            best_score = 0.0
+            best_cy_px = 0
+            tpl_h, tpl_w = shield_tpl.shape[:2]
+            for mult in (0.85, 0.95, 1.00, 1.05, 1.15, 1.30):
+                cur_sc = base_sc * mult
+                cur_tw = max(8, int(tpl_w * cur_sc))
+                cur_th = max(8, int(tpl_h * cur_sc))
+                if cur_tw >= sidebar.shape[1] or cur_th >= sidebar.shape[0]:
+                    continue
+                scaled = cv2.resize(
+                    shield_tpl,
+                    (cur_tw, cur_th),
+                    interpolation=cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR,
+                )
+                res = cv2.matchTemplate(sidebar, scaled, cv2.TM_CCOEFF_NORMED)
+                _, max_v, _, max_l = cv2.minMaxLoc(res)
+                if max_v > best_score:
+                    best_score = float(max_v)
+                    best_cy_px = int(sb_y1 + max_l[1] + cur_th // 2)
+
+            if best_score >= match_thresh and best_cy_px > 0:
+                cy_rel = float(best_cy_px) / float(max(1, gh))
+                return max(0.05, cy_rel - 0.055), min(0.80, cy_rel + 0.055), cy_rel
+
+    # 2. Fallback (cho test giả lập không gắn icon thật): kiểm tra quả địa cầu Thế Giới ở slot 1
     x1 = max(0, min(gw - 1, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MIN", 0.030))))
     x2 = max(x1 + 1, min(gw, int(gw * getattr(config, "RALLY_CHAT_TAB_REL_X_MAX", 0.180))))
     sy1 = max(0, min(gh - 1, int(gh * y1_rel)))

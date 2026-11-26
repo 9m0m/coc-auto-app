@@ -840,6 +840,42 @@ class TestRallyCases(unittest.TestCase):
         self.assertEqual(len(btns), 1)
         self.assertAlmostEqual(btns[0][1] / self.gw_h, 0.782, delta=0.03)
 
+    def test_case_22_lien_minh_tab_below_tradecard_stranger_dm(self):
+        """Khi tradecard / tin nhắn người lạ nhảy lên slot 1-2 đẩy Liên Minh xuống slot 3 -> KHÔNG bấm nhầm tradecard!"""
+        shield_tpl = assets.get_lien_minh_tab_template()
+        self.assertIsNotNone(shield_tpl)
+        scale = self.gw_h / float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
+        scaled_shield = cv2.resize(shield_tpl, (max(8, int(shield_tpl.shape[1] * scale)), max(8, int(shield_tpl.shape[0] * scale))))
+        sh, sw = scaled_shield.shape[:2]
+
+        # Tạo khung Chat: slot 1 là tradecard, slot 2 là tin nhắn người lạ, slot 3 (Y ~ 0.36) là Liên Minh đang tím sẵn
+        chat_tradecard_top = self._create_chat_frame(include_green_btn=False, lien_minh_active=False)
+        # Vẽ avatar giả ở slot 1 và slot 2
+        chat_tradecard_top[int(self.gw_h * 0.08):int(self.gw_h * 0.17), int(self.gw_w * 0.05):int(self.gw_w * 0.15)] = (200, 180, 120)
+        chat_tradecard_top[int(self.gw_h * 0.20):int(self.gw_h * 0.29), int(self.gw_w * 0.05):int(self.gw_w * 0.15)] = (120, 160, 220)
+        # Vẽ nền tím active ở slot 3 + dán đúng icon khiên vàng Liên Minh
+        chat_tradecard_top[int(self.gw_h * 0.31):int(self.gw_h * 0.42), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
+        sy = int(self.gw_h * 0.365) - sh // 2
+        sx = int(self.gw_w * 0.105) - sw // 2
+        chat_tradecard_top[sy:sy+sh, sx:sx+sw] = scaled_shield
+
+        # Đã đứng sẵn ở Liên Minh (slot 3 tím) -> _is_lien_minh_tab_active PHẢI là True (không được swap lên tradecard!)
+        self.assertTrue(rally._is_lien_minh_tab_active(chat_tradecard_top))
+        _, _, target_y = rally._detect_lien_minh_tab_target_y(chat_tradecard_top)
+        self.assertAlmostEqual(target_y, 0.365, delta=0.03)
+
+        # Nếu đang đứng nhầm ở tradecard (slot 1 tím, slot 3 không tím) -> phải bấm chuyển đúng xuống slot 3 (Liên Minh)
+        chat_on_tradecard = chat_tradecard_top.copy()
+        chat_on_tradecard[int(self.gw_h * 0.31):int(self.gw_h * 0.42), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (25, 25, 30)
+        chat_on_tradecard[sy:sy+sh, sx:sx+sw] = scaled_shield
+        chat_on_tradecard[int(self.gw_h * 0.08):int(self.gw_h * 0.17), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
+        self.assertFalse(rally._is_lien_minh_tab_active(chat_on_tradecard))
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_on_tradecard)):
+            rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(len(self.mock_adb.taps), 1)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.365, delta=0.03)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)
