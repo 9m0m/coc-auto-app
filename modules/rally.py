@@ -248,19 +248,31 @@ def _handle_rally_detail_popup(
     tab_high = screen_crop[int(gw_h * 0.02):int(gw_h * 0.08), int(gw_w * 0.03):int(gw_w * 0.38)]
     top_dim_high = screen_crop[int(gw_h * 0.01):int(gw_h * 0.07), int(gw_w * 0.45):int(gw_w * 0.90)]
     purple_band_high = screen_crop[int(gw_h * 0.09):int(gw_h * 0.115), int(gw_w * 0.05):int(gw_w * 0.95)]
+    sheet_body_high = screen_crop[int(gw_h * 0.60):int(gw_h * 0.88), int(gw_w * 0.30):int(gw_w * 0.90)]
     top_purple_ratio = 0.0
-    if purple_band_high.size > 0:
+    body_purple_ratio = 0.0
+    body_lavender_ratio = 1.0
+    if purple_band_high.size > 0 and sheet_body_high.size > 0:
         hsv_pb = cv2.cvtColor(purple_band_high, cv2.COLOR_BGR2HSV)
-        pm_high = cv2.inRange(hsv_pb, np.array([120, 45, 70], dtype=np.uint8), np.array([160, 180, 170], dtype=np.uint8))
+        pm_high = cv2.inRange(hsv_pb, np.array([115, 35, 60], dtype=np.uint8), np.array([160, 220, 255], dtype=np.uint8))
         top_purple_ratio = float(np.count_nonzero(pm_high)) / float(max(1, purple_band_high.shape[0] * purple_band_high.shape[1]))
+
+        hsv_sb = cv2.cvtColor(sheet_body_high, cv2.COLOR_BGR2HSV)
+        bm_purp = cv2.inRange(hsv_sb, np.array([115, 35, 60], dtype=np.uint8), np.array([160, 220, 255], dtype=np.uint8))
+        bm_lav = cv2.inRange(hsv_sb, np.array([110, 10, 160], dtype=np.uint8), np.array([170, 75, 255], dtype=np.uint8))
+        body_pixels = float(max(1, sheet_body_high.shape[0] * sheet_body_high.shape[1]))
+        body_purple_ratio = float(np.count_nonzero(bm_purp)) / body_pixels
+        body_lavender_ratio = float(np.count_nonzero(bm_lav)) / body_pixels
 
     is_high_sheet = (
         not is_low_sheet
         and tab_high.size > 0
         and top_dim_high.size > 0
-        and np.mean(tab_high) < 75.0
-        and np.mean(top_dim_high) < 55.0
-        and top_purple_ratio >= 0.18
+        and np.mean(tab_high) < 155.0
+        and np.mean(top_dim_high) < 95.0
+        and top_purple_ratio >= 0.25
+        and body_purple_ratio >= 0.55
+        and body_lavender_ratio < 0.15
     )
     is_multi_sheet = is_low_sheet or is_high_sheet
 
@@ -293,7 +305,7 @@ def _handle_rally_detail_popup(
         # Xác thực xem có thực sự là danh sách Rally không (phải có nút xanh hoặc nút xám của các thẻ Rally)
         card_crop_chk = screen_crop[by1:by2, bx1:bx2]
         hsv_chk = cv2.cvtColor(card_crop_chk, cv2.COLOR_BGR2HSV)
-        grey_mask_chk = cv2.inRange(hsv_chk, np.array([0, 0, 70]), np.array([180, 50, 210]))
+        grey_mask_chk = cv2.inRange(hsv_chk, np.array([0, 0, 70]), np.array([180, 60, 225]))
         contours_grey_chk, _ = cv2.findContours(grey_mask_chk, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         has_any_card = (
             len(green_btns) > 0
@@ -349,9 +361,26 @@ def _handle_rally_detail_popup(
                     if log_cb:
                         log_cb(f"Ô ({_last_clicked_tile[0]}, {_last_clicked_tile[1]}) đã đầy -> Bỏ qua {int(getattr(config, 'RALLY_FULL_TILE_COOLDOWN', 30.0))}s")
 
-            safe_close_x = int(gw_l + gw_w * (0.70 if is_high_sheet else 0.50))
-            safe_close_y = int(gw_t + gw_h * (0.04 if is_high_sheet else 0.12))
-            _adb_tap(adb, vp, safe_close_x, safe_close_y, "Đóng Popup danh sách", log_cb)
+            # Đóng bảng danh sách Type A: nếu có nút [X] trắng ở dải đáy (như bảng 總攻 toàn màn hình) thì bấm chính tâm [X],
+            # ngược lại bấm vùng mờ phía trên (0.70, 0.04) cho bảng cao hoặc (0.50, 0.12) cho bảng thấp.
+            xb_y1, xb_y2 = int(gw_h * 0.915), int(gw_h * 0.985)
+            xb_x1, xb_x2 = int(gw_w * 0.42), int(gw_w * 0.58)
+            xb_crop = screen_crop[xb_y1:xb_y2, xb_x1:xb_x2]
+            closed_via_x = False
+            if xb_crop.size > 0:
+                xb_mask = (xb_crop[:, :, 0] > 175) & (xb_crop[:, :, 1] > 175) & (xb_crop[:, :, 2] > 175)
+                xb_ratio = float(np.count_nonzero(xb_mask)) / float(max(1, xb_crop.shape[0] * xb_crop.shape[1]))
+                if xb_ratio >= 0.04:
+                    ys_x, xs_x = np.where(xb_mask)
+                    cx_rel = int(xb_x1 + float(np.mean(xs_x)))
+                    cy_rel = int(xb_y1 + float(np.mean(ys_x)))
+                    _adb_tap(adb, vp, gw_l + cx_rel, gw_t + cy_rel, "Đóng bảng danh sách Rally (Nút X)", log_cb)
+                    closed_via_x = True
+
+            if not closed_via_x:
+                safe_close_x = int(gw_l + gw_w * (0.70 if is_high_sheet else 0.50))
+                safe_close_y = int(gw_t + gw_h * (0.04 if is_high_sheet else 0.12))
+                _adb_tap(adb, vp, safe_close_x, safe_close_y, "Đóng Popup danh sách", log_cb)
             _sleep(0.35, stop_event)
             _last_clicked_tile = None
             return True, joined_any

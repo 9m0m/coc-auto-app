@@ -876,6 +876,27 @@ class TestRallyCases(unittest.TestCase):
         self.assertEqual(len(self.mock_adb.taps), 1)
         self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.365, delta=0.03)
 
+    def test_case_23_high_multi_rally_sheet_with_bottom_x_even_when_type_d_disabled(self):
+        """Bảng 2+ Rally (總攻) có thanh đen + nút [X] trắng ở đáy -> Phải bấm chính tâm [X] kể cả khi allow_type_d_close_x=False."""
+        frame = self._create_blank_frame(bg_bgr=(190, 90, 108))  # Nền tím bảng 總攻 (hơi sáng như ảnh chụp)
+        frame[int(self.gw_h * 0.01):int(self.gw_h * 0.085), :] = (65, 35, 45)  # Header tối phía trên
+        # Thẻ 1 nút xám 'Đã đầy' (已達滿員)
+        frame[int(self.gw_h * 0.23):int(self.gw_h * 0.285), int(self.gw_w * 0.64):int(self.gw_w * 0.91)] = (170, 170, 170)
+        # Thanh đen ở đáy + nút [X] trắng ở giữa (Y ~ 0.945)
+        frame[int(self.gw_h * 0.91):self.gw_h, :] = (35, 25, 25)
+        frame[int(self.gw_h * 0.93):int(self.gw_h * 0.96), int(self.gw_w * 0.47):int(self.gw_w * 0.53)] = (240, 240, 240)
+
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(frame)):
+            is_pop, is_join = rally._handle_rally_detail_popup(
+                None, self.vp, self.mock_adb, self.stop_event, allow_type_d_close_x=False
+            )
+
+        self.assertTrue(is_pop)
+        self.assertFalse(is_join)
+        self.assertEqual(len(self.mock_adb.taps), 1)
+        self.assertAlmostEqual(self.mock_adb.taps[0][0] / self.gw_w, 0.50, delta=0.04)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.945, delta=0.03)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)
