@@ -132,17 +132,76 @@ RALLY_REWARD_BTN_REL_Y_MAX: float = 0.880
 HSV_RALLY_REWARD_GREEN_LOWER = [40, 110, 110]
 HSV_RALLY_REWARD_GREEN_UPPER = [80, 255, 255]
 RALLY_REWARD_PX_THRESHOLD: int = 2000
+RALLY_REWARD_GREEN_RATIO: float = 0.22
 
-# C. Toạ độ tỉ lệ Màn hình Chat Phe Vàng
+# C. Toạ độ tỉ lệ Màn hình Chat & Chế độ Sa Hải Dune (Chat Liên Minh)
+# Nút bong bóng Chat trên Mapview (góc dưới bên phải) và vùng kiểm tra badge đỏ
+RALLY_CHAT_ICON_X: float = 0.927
+RALLY_CHAT_ICON_Y: float = 0.770
+RALLY_CHAT_BADGE_REL_X_MIN: float = 0.880
+RALLY_CHAT_BADGE_REL_X_MAX: float = 0.990
+RALLY_CHAT_BADGE_REL_Y_MIN: float = 0.710
+RALLY_CHAT_BADGE_REL_Y_MAX: float = 0.800
+RALLY_CHAT_BADGE_MIN_RATIO: float = 0.008
+
+# Tab "Liên Minh" bên trái khung Chat và nút đóng [X] an toàn ở đáy khi Chat đang mở
+RALLY_CHAT_LIEN_MINH_TAB_X: float = 0.110
+RALLY_CHAT_LIEN_MINH_TAB_Y: float = 0.119
+RALLY_CHAT_TAB_REL_X_MIN: float = 0.030
+RALLY_CHAT_TAB_REL_X_MAX: float = 0.180
+RALLY_CHAT_TAB_REL_Y_MIN: float = 0.070
+RALLY_CHAT_TAB_REL_Y_MAX: float = 0.200
+RALLY_CHAT_TAB_PURPLE_RATIO: float = 0.28
+
+RALLY_CHAT_CLOSE_X: float = 0.500
+RALLY_CHAT_CLOSE_Y: float = 0.955
+
+# Nhận diện khung Chat đang mở (Send button xanh + nền trắng tin nhắn + đáy tối)
+RALLY_CHAT_SEND_REL_X_MIN: float = 0.720
+RALLY_CHAT_SEND_REL_X_MAX: float = 0.960
+RALLY_CHAT_SEND_REL_Y_MIN: float = 0.820
+RALLY_CHAT_SEND_REL_Y_MAX: float = 0.920
+RALLY_CHAT_SEND_GREEN_RATIO: float = 0.18
+
+RALLY_CHAT_BODY_REL_X_MIN: float = 0.220
+RALLY_CHAT_BODY_REL_X_MAX: float = 0.900
+RALLY_CHAT_BODY_REL_Y_MIN: float = 0.150
+RALLY_CHAT_BODY_REL_Y_MAX: float = 0.800
+RALLY_CHAT_BODY_LIGHT_RATIO: float = 0.42
+
 # Vùng quét các nút "Tham gia" màu xanh lá trong khung chat
-CHAT_MESSAGES_REL_X_MIN: float = 0.320
+CHAT_MESSAGES_REL_X_MIN: float = 0.280
 CHAT_MESSAGES_REL_X_MAX: float = 0.900
-CHAT_MESSAGES_REL_Y_MIN: float = 0.150
+CHAT_MESSAGES_REL_Y_MIN: float = 0.140
 CHAT_MESSAGES_REL_Y_MAX: float = 0.820
+
+# Lọc hình học nút "Tham gia" nằm ngang trong Chat (loại nút Gửi hình tròn & icon nhỏ)
+RALLY_CHAT_BTN_MIN_W_RATIO: float = 0.250
+RALLY_CHAT_BTN_MIN_H_RATIO: float = 0.015
+RALLY_CHAT_BTN_MAX_H_RATIO: float = 0.085
+RALLY_CHAT_BTN_MIN_ASPECT: float = 2.5
+
+# Thông số vuốt chống trôi tin nhắn trong Chat (Vuốt lên xem tin cũ -> Vuốt xuống về đáy)
+RALLY_CHAT_SWIPE_X: float = 0.560
+RALLY_CHAT_SWIPE_TOP_Y: float = 0.280
+RALLY_CHAT_SWIPE_BOTTOM_Y: float = 0.720
+RALLY_CHAT_SWIPE_DURATION_MS: int = 280
+RALLY_CHAT_SCROLL_UP_STEPS: int = 2
 
 # Nút mũi tên tím cuộn xuống tin nhắn mới nhất trong Chat (góc dưới phải)
 CHAT_SCROLL_BOTTOM_X: float = 0.915
 CHAT_SCROLL_BOTTOM_Y: float = 0.772
+
+# Chu kỳ & độ trễ riêng cho chế độ Dune (Camp trong Chat Liên Minh)
+RALLY_DELAY_AFTER_CHAT_OPEN: float = 0.85
+RALLY_DELAY_AFTER_TAB_CLICK: float = 0.65
+RALLY_DELAY_AFTER_CHAT_SCROLL: float = 0.75
+RALLY_DELAY_AFTER_CHAT_CLOSE: float = 0.45
+RALLY_DUNE_DRIFT_SCROLL_INTERVAL: float = 8.0
+RALLY_DUNE_REWARD_CHECK_INTERVAL: float = 25.0
+RALLY_DUNE_TAP_COOLDOWN: float = 8.0
+RALLY_DUNE_FULL_CARD_COOLDOWN: float = 45.0
+RALLY_DUNE_CARD_DIFF_THRESHOLD: float = 12.0
 
 # D. Dải màu & ngưỡng nhận diện cho Rally
 # Nút "Tham gia" màu xanh lá (Nút thật có > 12.000 px, ngưỡng 2500 loại bỏ 100% icon Mapview)
@@ -196,8 +255,8 @@ RALLY_DELAY_AFTER_BACK_CLICK: float = 0.70
 # Thời gian chờ sau khi bấm "Xác Nhận" nhận quà (chờ hoạt ảnh "Phần Thưởng!" 2s kết thúc và Mapview hiện lại)
 RALLY_DELAY_AFTER_CLAIM_REWARD: float = 2.20
 
-# Thời gian chờ sau khi bấm "Tham gia" trong Chat (đợi game tải và mở popup)
-RALLY_DELAY_AFTER_CHAT_CLICK: float = 0.90
+# Thời gian chờ sau khi bấm "Tham gia" trong Chat (đợi game tải bản đồ và mở popup)
+RALLY_DELAY_AFTER_CHAT_CLICK: float = 1.10
 
 # Thời gian chờ sau khi click Avatar trên Map (đợi tải dữ liệu ô trên map)
 RALLY_DELAY_AFTER_MAP_CLICK: float = 0.90

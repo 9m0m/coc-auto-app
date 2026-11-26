@@ -593,6 +593,188 @@ class TestRallyCases(unittest.TestCase):
             self.assertEqual(len(self.mock_adb.taps), 1)
             self.assertAlmostEqual(self.mock_adb.taps[0][0] / sw6, config.RALLY_POPUP_BACK_X, delta=0.08)
 
+    # -------------------------------------------------------------
+    # CASE 15: Dune Chat Detection, Anti-Drift Scroll & Join Flow
+    # -------------------------------------------------------------
+    def _create_chat_frame(self, include_green_btn: bool = False, lien_minh_active: bool = True) -> np.ndarray:
+        """Tạo khung giả lập giao diện Chat Liên Minh chuẩn tỉ lệ."""
+        frame = self._create_blank_frame(bg_bgr=(25, 25, 30))
+        # Vùng thân Chat nền trắng/xám sáng
+        frame[int(self.gw_h * 0.14):int(self.gw_h * 0.83), int(self.gw_w * 0.19):int(self.gw_w * 0.93)] = (238, 236, 240)
+        # Thanh nhập liệu trắng + Nút Gửi xanh lá ở góc dưới phải
+        frame[int(self.gw_h * 0.84):int(self.gw_h * 0.90), int(self.gw_w * 0.20):int(self.gw_w * 0.65)] = (230, 230, 230)
+        frame[int(self.gw_h * 0.835):int(self.gw_h * 0.905), int(self.gw_w * 0.76):int(self.gw_w * 0.91)] = (35, 195, 50)
+        # Tab Liên Minh bên trái
+        if lien_minh_active:
+            frame[int(self.gw_h * 0.08):int(self.gw_h * 0.18), int(self.gw_w * 0.04):int(self.gw_w * 0.17)] = (220, 60, 140)
+        # Nút Tham gia màu xanh lá dạng thanh ngang dài trong thẻ Rally
+        if include_green_btn:
+            by1, by2 = int(self.gw_h * 0.69), int(self.gw_h * 0.735)
+            bx1, bx2 = int(self.gw_w * 0.34), int(self.gw_w * 0.84)
+            frame[by1:by2, bx1:bx2] = (35, 200, 50)
+        return frame
+
+    def test_case_15_dune_chat_detection_and_bottom_join(self):
+        """Dune Chat: Phân biệt đúng Chat vs Mapview/Popup, tìm nút Tham gia ngang & bỏ qua nút Gửi."""
+        map_frame = self._create_blank_frame(bg_bgr=(50, 150, 200))
+        self.assertFalse(rally._is_chat_open(map_frame))
+
+        chat_empty = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        self.assertTrue(rally._is_chat_open(chat_empty))
+        self.assertTrue(rally._is_lien_minh_tab_active(chat_empty))
+        self.assertEqual(rally._find_chat_join_buttons(chat_empty), [])
+
+        chat_with_rally = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        btns = rally._find_chat_join_buttons(chat_with_rally)
+        self.assertEqual(len(btns), 1, "Chỉ được bắt đúng 1 nút Tham gia ngang, không bắt nút Gửi")
+        self.assertAlmostEqual(btns[0][0] / self.gw_w, 0.59, delta=0.05)
+        self.assertAlmostEqual(btns[0][1] / self.gw_h, 0.712, delta=0.04)
+
+    def test_case_16_dune_chat_anti_drift_scroll_and_popup_join(self):
+        """Dune Chat chống trôi: Đáy không có nút -> Vuốt lên thấy Rally -> Bấm vào Popup Type B -> Join & Back."""
+        chat_empty = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        chat_drifted = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+
+        # Popup Type B mở lên sau khi bấm nút xanh trong Chat
+        popup_frame = self._create_blank_frame()
+        self._draw_popup_card(popup_frame)
+        self._draw_purple_back_btn(popup_frame)
+        popup_frame[int(self.gw_h * 0.90):int(self.gw_h * 0.96), int(self.gw_w * 0.60):int(self.gw_w * 0.85)] = (30, 200, 30)
+
+        def mock_grab(sct, mon):
+            if len(self.mock_adb.swipes) == 0:
+                return make_mock_grab(chat_empty)(sct, mon)
+            if len(self.mock_adb.taps) == 0:
+                return make_mock_grab(chat_drifted)(sct, mon)
+            return make_mock_grab(popup_frame)(sct, mon)
+
+        with patch("modules.rally.safe_grab", side_effect=mock_grab):
+            res = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event)
+
+        self.assertEqual(res, "JOINED")
+        self.assertEqual(len(self.mock_adb.swipes), 1, "Phải vuốt lên 1 nhịp để tìm Rally bị trôi")
+        # Tap 1: Tham gia trong Chat; Tap 2: Tham gia trong Popup; Tap 3: Back tím về Map
+        self.assertEqual(len(self.mock_adb.taps), 3)
+        self.assertAlmostEqual(self.mock_adb.taps[2][0] / self.gw_w, config.RALLY_POPUP_BACK_X, delta=0.05)
+
+    def test_case_17_dune_chat_no_rally_scroll_back_and_safe_close(self):
+        """Dune Chat: allow_scroll=False không vuốt; allow_scroll=True vuốt lên 2 nhịp rồi vuốt xuống lại đáy 2 nhịp."""
+        chat_empty = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_empty)):
+            res_fast = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res_fast, "NONE")
+        self.assertEqual(len(self.mock_adb.swipes), 0, "Chế độ camp nhanh không được vuốt liên tục")
+
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_empty)):
+            res = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=True)
+
+        self.assertEqual(res, "NONE")
+        self.assertEqual(len(self.mock_adb.swipes), 4, "Phải vuốt lên 2 nhịp rồi vuốt xuống lại đáy 2 nhịp")
+
+        # Cooldown chống bấm lặp khi nút xanh bấm vào không mở popup
+        self.mock_adb.clear()
+        chat_stale = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_stale)):
+            res_nopop = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res_nopop, "NO_POPUP")
+        self.assertEqual(len(self.mock_adb.taps), 1)
+
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_stale)):
+            res_cooldown = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res_cooldown, "NONE")
+        self.assertEqual(len(self.mock_adb.taps), 0, "Vị trí Y vừa lỗi phải bị khóa cooldown 8s")
+
+        # Đóng Chat an toàn khi đang mở Chat
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_empty)):
+            closed = rally._close_chat_if_open(None, self.vp, self.mock_adb, self.stop_event)
+        self.assertTrue(closed)
+        self.assertEqual(len(self.mock_adb.taps), 1)
+
+        # Trên Mapview tuyệt đối không bấm [X]
+        self.mock_adb.clear()
+        map_frame = self._create_blank_frame(bg_bgr=(50, 150, 200))
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(map_frame)):
+            closed_map = rally._close_chat_if_open(None, self.vp, self.mock_adb, self.stop_event)
+        self.assertFalse(closed_map)
+        self.assertEqual(len(self.mock_adb.taps), 0)
+
+    def test_case_18_dune_chat_full_card_lag_state_fingerprint(self):
+        """Lag state 4/4 vẫn hiện nút xanh: Vào Popup 'Đã đầy' -> Back -> Khóa thẻ 45s kể cả khi thẻ trôi Y."""
+        # Tạo thẻ A (4/4 bị lag nút xanh ở Y=0.71) với họa tiết riêng
+        chat_lag_a = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        chat_lag_a[int(self.gw_h * 0.61):int(self.gw_h * 0.67), int(self.gw_w * 0.35):int(self.gw_w * 0.60)] = (180, 70, 140)
+
+        # Popup 'Đã đầy' (nút Back tím + nút xám)
+        full_popup = self._create_blank_frame()
+        self._draw_popup_card(full_popup)
+        self._draw_purple_back_btn(full_popup)
+        full_popup[int(self.gw_h * 0.90):int(self.gw_h * 0.96), int(self.gw_w * 0.30):int(self.gw_w * 0.85)] = (150, 150, 150)
+
+        def mock_grab_full(sct, mon):
+            if len(self.mock_adb.taps) == 0:
+                return make_mock_grab(chat_lag_a)(sct, mon)
+            return make_mock_grab(full_popup)(sct, mon)
+
+        with patch("modules.rally.safe_grab", side_effect=mock_grab_full):
+            res1 = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res1, "POPUP_HANDLED")
+        self.assertEqual(len(self.mock_adb.taps), 2)  # Tap 1: Chat, Tap 2: Back tím (không bấm nút xám)
+
+        # Thẻ A bị trôi lên trên ~200px (khác hẳn y_bucket!) -> Vẫn phải bị khóa cooldown 45s nhờ chữ ký thẻ
+        chat_lag_a_shifted = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        by1, by2 = int(self.gw_h * 0.50), int(self.gw_h * 0.545)
+        bx1, bx2 = int(self.gw_w * 0.34), int(self.gw_w * 0.84)
+        chat_lag_a_shifted[by1:by2, bx1:bx2] = (35, 200, 50)
+        chat_lag_a_shifted[int(self.gw_h * 0.42):int(self.gw_h * 0.48), int(self.gw_w * 0.35):int(self.gw_w * 0.60)] = (180, 70, 140)
+
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_lag_a_shifted)):
+            res2 = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res2, "NONE")
+        self.assertEqual(len(self.mock_adb.taps), 0, "Thẻ 4/4 bị trôi vị trí vẫn phải bị chặn không bấm lại")
+
+        # Thẻ B hoàn toàn mới xuất hiện ở đúng vị trí Y cũ -> Phải bấm ngay không bị chặn oan
+        chat_new_b = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        chat_new_b[int(self.gw_h * 0.61):int(self.gw_h * 0.67), int(self.gw_w * 0.35):int(self.gw_w * 0.80)] = (40, 190, 210)
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_new_b)):
+            res3 = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res3, "NO_POPUP")
+        self.assertGreaterEqual(len(self.mock_adb.taps), 1, "Thẻ mới khác nội dung ở vị trí Y cũ phải bấm được ngay")
+
+    def test_case_19_high_multi_rally_sheet(self):
+        """Bảng danh sách nhiều Rally cùng 1 ô dạng cao (Dune Y=0.02..0.08): Bấm nút xanh, cuộn và đóng đúng vùng mờ phía trên."""
+        frame = self._create_blank_frame(bg_bgr=(118, 65, 75))
+        # Thanh tiêu đề tối trên cùng Y: 0.02..0.08 và vùng mờ góc phải Y: 0.01..0.07
+        frame[int(self.gw_h * 0.01):int(self.gw_h * 0.085), :] = (40, 30, 35)
+        # Thẻ 1 có nút xanh (Y: 0.25..0.305 -> bh ~ 0.055) + icon vuông xanh nhỏ cạnh bên
+        frame[int(self.gw_h * 0.25):int(self.gw_h * 0.305), int(self.gw_w * 0.64):int(self.gw_w * 0.91)] = (35, 200, 50)
+        frame[int(self.gw_h * 0.42):int(self.gw_h * 0.48), int(self.gw_w * 0.80):int(self.gw_w * 0.90)] = (35, 200, 50)  # icon lực chiến vuông
+        # Thẻ 2 nút xám
+        frame[int(self.gw_h * 0.51):int(self.gw_h * 0.565), int(self.gw_w * 0.64):int(self.gw_w * 0.91)] = (140, 140, 140)
+
+        frame_after_scroll = frame.copy()
+        frame_after_scroll[int(self.gw_h * 0.25):int(self.gw_h * 0.305), int(self.gw_w * 0.64):int(self.gw_w * 0.91)] = (140, 140, 140)
+
+        def mock_grab(sct, mon):
+            cur = frame if len(self.mock_adb.swipes) == 0 else frame_after_scroll
+            return make_mock_grab(cur)(sct, mon)
+
+        with patch("modules.rally.safe_grab", side_effect=mock_grab):
+            is_pop, is_join = rally._handle_rally_detail_popup(None, self.vp, self.mock_adb, self.stop_event)
+
+        self.assertTrue(is_pop)
+        self.assertTrue(is_join)
+        self.assertEqual(len(self.mock_adb.swipes), 1)
+        # Tap 1: Tham gia thẻ 1; Tap 2: Đóng ở vùng mờ phía trên (0.70, 0.04)
+        self.assertEqual(len(self.mock_adb.taps), 2)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.277, delta=0.04)
+        self.assertAlmostEqual(self.mock_adb.taps[1][0] / self.gw_w, 0.70, delta=0.05)
+        self.assertAlmostEqual(self.mock_adb.taps[1][1] / self.gw_h, 0.04, delta=0.03)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

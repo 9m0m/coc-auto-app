@@ -179,8 +179,8 @@ class AutoApp(ctk.CTk):
 
         # Thiết lập cửa sổ chính
         self.title("COC AutoMaster")
-        self.geometry("520x730")
-        self.minsize(480, 620)
+        self.geometry("520x780")
+        self.minsize(480, 660)
         self.resizable(True, True)
         
         # Gam màu nền Slate trung tính dịu mắt (#0c1017)
@@ -204,13 +204,16 @@ class AutoApp(ctk.CTk):
         self.stop_event = threading.Event()
         self.is_running = False
         self.selected_mode = "rally"
+        self.rally_mode = "map"             # "map" (Gold Rush thường) hoặc "dune" (Sa Hải Dune - Chat)
         self.fishing_click_mode = "mouse"  # "mouse" (Win32 siêu tốc 0.02s) hoặc "adb" (ADB ngầm)
+        self.card_rally_options = None
         self.card_fishing_options = None
 
         # Khởi tạo các thành phần giao diện chuẩn Slate & Blue
         self._build_header()
         self._build_device_card()
         self._build_mode_selector()
+        self._build_rally_options()
         self._build_fishing_options()
         self._build_action_controls()
         self._build_terminal_log()
@@ -435,7 +438,7 @@ class AutoApp(ctk.CTk):
         # Huy hiệu viên thuốc hiển thị chế độ đang chọn (ngắn gọn, xúc tích, vừa khít nội dung)
         self.lbl_mode_status = ctk.CTkLabel(
             self.card_mode,
-            text="● Auto Rally",
+            text="● Auto Rally (Map Thường)",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             fg_color="#0c1728",
             text_color="#38bdf8",
@@ -444,6 +447,89 @@ class AutoApp(ctk.CTk):
             pady=5,
         )
         self.lbl_mode_status.pack(pady=(0, 14))
+
+    def _build_rally_options(self):
+        """Khung tùy chọn chế độ cho Auto Rally (Map Thường vs Sa Hải Dune Chat)."""
+        self.card_rally_options = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color="#151c28",
+            border_width=1,
+            border_color="#243044",
+        )
+        self.card_rally_options.pack(fill="x", padx=24, pady=4)
+
+        capsule = ctk.CTkFrame(
+            self.card_rally_options,
+            corner_radius=8,
+            fg_color="#090d15",
+            border_width=1,
+            border_color="#1e2738",
+        )
+        capsule.pack(fill="x", padx=12, pady=(8, 4))
+
+        inner_row = ctk.CTkFrame(capsule, fg_color="transparent")
+        inner_row.pack(fill="x", padx=3, pady=3)
+
+        self.btn_rally_map = ctk.CTkButton(
+            inner_row,
+            text="Map Thường",
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            corner_radius=6,
+            text_color="#ffffff",
+            command=lambda: self._set_rally_mode("map"),
+        )
+        self.btn_rally_map.pack(side="left", fill="x", expand=True, padx=2)
+
+        self.btn_rally_dune = ctk.CTkButton(
+            inner_row,
+            text="Sa Hải Dune (Chat)",
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            fg_color="transparent",
+            hover_color="#182030",
+            corner_radius=6,
+            text_color="#94a3b8",
+            command=lambda: self._set_rally_mode("dune"),
+        )
+        self.btn_rally_dune.pack(side="left", fill="x", expand=True, padx=2)
+
+        self.lbl_rally_note = ctk.CTkLabel(
+            self.card_rally_options,
+            text="🗺️ Gold Rush thường: Tự zoom toàn cảnh 4 phe và bấm Rally trực tiếp trên Map.",
+            font=ctk.CTkFont(family="Segoe UI", size=10),
+            text_color="#38bdf8",
+            anchor="w",
+            justify="left",
+        )
+        self.lbl_rally_note.pack(fill="x", padx=14, pady=(0, 6))
+
+    def _set_rally_mode(self, rmode: str):
+        """Chuyển đổi giữa Gold Rush Map Thường và Sa Hải Dune (Chat Liên Minh)."""
+        if self.is_running:
+            return
+        self.rally_mode = rmode
+        if rmode == "map":
+            self.btn_rally_map.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
+            self.btn_rally_dune.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
+            self.lbl_rally_note.configure(
+                text="🗺️ Gold Rush thường: Tự zoom toàn cảnh 4 phe và bấm Rally trực tiếp trên Map.",
+                text_color="#38bdf8",
+            )
+            self.lbl_mode_status.configure(text="● Auto Rally (Map Thường)")
+            self.log("Chế độ Rally: Map Thường (Gold Rush toàn cảnh)")
+        else:
+            self.btn_rally_map.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
+            self.btn_rally_dune.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
+            self.lbl_rally_note.configure(
+                text="🏜️ Dune (Map lớn): Canh Chat Liên Minh, chống trôi tin & tự bấm Popup Rally.",
+                text_color="#38bdf8",
+            )
+            self.lbl_mode_status.configure(text="● Auto Rally (Sa Hải Dune)")
+            self.log("Chế độ Rally: Sa Hải Dune (Quét Chat Liên Minh)")
 
     def _build_fishing_options(self):
         """Khung tùy chọn cơ chế click riêng cho Auto Câu Cá (Chiếm chuột vs Click ảo)."""
@@ -552,20 +638,27 @@ class AutoApp(ctk.CTk):
 
         if mode == "rally":
             self.btn_mode_rally.configure(**active_cfg)
-            self.lbl_mode_status.configure(text="● Auto Rally")
+            rally_desc = "Sa Hải Dune" if self.rally_mode == "dune" else "Map Thường"
+            self.lbl_mode_status.configure(text=f"● Auto Rally ({rally_desc})")
             if self.card_fishing_options:
                 self.card_fishing_options.pack_forget()
-            self.log("Chuyển chế độ: Auto Rally")
+            if self.card_rally_options:
+                self.card_rally_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
+            self.log(f"Chuyển chế độ: Auto Rally ({rally_desc})")
         elif mode == "fishing":
             self.btn_mode_fishing.configure(**active_cfg)
             mode_desc = "Chiếm chuột" if self.fishing_click_mode == "mouse" else "Click ảo"
             self.lbl_mode_status.configure(text=f"● Auto Câu Cá ({mode_desc})")
+            if self.card_rally_options:
+                self.card_rally_options.pack_forget()
             if self.card_fishing_options:
                 self.card_fishing_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
             self.log(f"Chuyển chế độ: Auto Câu Cá ({mode_desc})")
         elif mode == "adventure":
             self.btn_mode_adventure.configure(**active_cfg)
             self.lbl_mode_status.configure(text="● Auto Phiêu Lưu")
+            if self.card_rally_options:
+                self.card_rally_options.pack_forget()
             if self.card_fishing_options:
                 self.card_fishing_options.pack_forget()
             self.log("Chuyển chế độ: Auto Phiêu Lưu")
@@ -762,15 +855,28 @@ class AutoApp(ctk.CTk):
         self.btn_mode_rally.configure(state="disabled")
         self.btn_mode_fishing.configure(state="disabled")
         self.btn_mode_adventure.configure(state="disabled")
+        self.btn_rally_map.configure(state="disabled")
+        self.btn_rally_dune.configure(state="disabled")
 
         mode = self.selected_mode
-        mode_names = {"rally": "Auto Rally", "fishing": "Auto Câu Cá", "adventure": "Auto Phiêu Lưu"}
+        rally_desc = "Sa Hải Dune" if self.rally_mode == "dune" else "Map Thường"
+        mode_names = {
+            "rally": f"Auto Rally ({rally_desc})",
+            "fishing": "Auto Câu Cá",
+            "adventure": "Auto Phiêu Lưu",
+        }
         self.log(f"🚀 BẮT ĐẦU CHẠY: {mode_names.get(mode, mode)}")
 
         def _runner():
             try:
                 if mode == "rally":
-                    run_rally_loop(self.adb, self.get_current_viewport, self.stop_event, self.log)
+                    run_rally_loop(
+                        self.adb,
+                        self.get_current_viewport,
+                        self.stop_event,
+                        self.log,
+                        rally_mode=self.rally_mode,
+                    )
                 elif mode == "fishing":
                     run_fishing_loop(
                         self.adb,
@@ -805,6 +911,8 @@ class AutoApp(ctk.CTk):
         self.btn_mode_rally.configure(state="normal")
         self.btn_mode_fishing.configure(state="normal")
         self.btn_mode_adventure.configure(state="normal")
+        self.btn_rally_map.configure(state="normal")
+        self.btn_rally_dune.configure(state="normal")
         self.log("⏹ Đã dừng hoạt động.")
 
     def on_closing(self):
