@@ -158,8 +158,9 @@ RALLY_CHAT_TAB_PURPLE_RATIO: float = 0.28
 RALLY_CHAT_WORLD_CYAN_RATIO: float = 0.05
 RALLY_CHAT_WORLD_MAX_GOLD_RATIO: float = 0.03
 
+# Tọa độ khoảng trống phía trên đỉnh khung Chat để đóng Chat an toàn (tránh xa nút [X] ở đáy Y=0.955)
 RALLY_CHAT_CLOSE_X: float = 0.500
-RALLY_CHAT_CLOSE_Y: float = 0.955
+RALLY_CHAT_CLOSE_Y: float = 0.030
 
 # Nhận diện khung Chat đang mở (Send button xanh + nền trắng tin nhắn + đáy tối)
 RALLY_CHAT_SEND_REL_X_MIN: float = 0.720

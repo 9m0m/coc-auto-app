@@ -872,7 +872,7 @@ def _close_chat_if_open(
     stop_event: threading.Event,
     log_cb: Optional[Callable[[str], None]] = None,
 ) -> bool:
-    """Chỉ bấm nút [X] đóng Chat khi xác nhận chắc chắn khung Chat đang mở (tránh bấm nhầm thoát Map)."""
+    """Chỉ bấm khoảng trống phía trên đỉnh khung Chat (Y=0.030) để đóng Chat khi xác nhận Chat đang mở (tránh xa nút [X] ở đáy)."""
     if stop_event.is_set():
         return False
     gw_l, gw_t, gw_w, gw_h = vp
@@ -880,8 +880,8 @@ def _close_chat_if_open(
     if frame is None or not _is_chat_open(frame):
         return False
     close_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_CLOSE_X", 0.500))
-    close_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_CLOSE_Y", 0.955))
-    _adb_tap(adb, vp, close_x, close_y, "Đóng khung Chat về Map", log_cb)
+    close_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_CLOSE_Y", 0.030))
+    _adb_tap(adb, vp, close_x, close_y, "Đóng khung Chat (vùng trên đỉnh)", log_cb)
     _sleep(getattr(config, "RALLY_DELAY_AFTER_CHAT_CLOSE", 0.40), stop_event)
     return True
 

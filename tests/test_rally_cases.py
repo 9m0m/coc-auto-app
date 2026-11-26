@@ -686,12 +686,13 @@ class TestRallyCases(unittest.TestCase):
         self.assertEqual(res_cooldown, "NONE")
         self.assertEqual(len(self.mock_adb.taps), 0, "Vị trí Y vừa lỗi phải bị khóa cooldown 8s")
 
-        # Đóng Chat an toàn khi đang mở Chat
+        # Đóng Chat an toàn bằng khoảng trống phía trên đỉnh (Y ~ 0.030, tránh xa nút X đáy 0.955)
         self.mock_adb.clear()
         with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_empty)):
             closed = rally._close_chat_if_open(None, self.vp, self.mock_adb, self.stop_event)
         self.assertTrue(closed)
         self.assertEqual(len(self.mock_adb.taps), 1)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.030, delta=0.02)
 
         # Trên Mapview tuyệt đối không bấm [X]
         self.mock_adb.clear()
