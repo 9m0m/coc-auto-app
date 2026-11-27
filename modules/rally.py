@@ -1274,9 +1274,9 @@ def scan_and_join_chat_rallies(
         if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_SCROLL_CLICK", 0.45)), stop_event):
             return "STOPPED"
     else:
-        down_top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_TOP_Y", 0.180))
-        down_bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_BOTTOM_Y", 0.780))
-        down_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DOWN_DURATION_MS", 220))
+        down_top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_TOP_Y", 0.160))
+        down_bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_BOTTOM_Y", 0.800))
+        down_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DOWN_DURATION_MS", 140))
         for step in range(swiped_up):
             if stop_event.is_set():
                 return "STOPPED"
