@@ -1145,6 +1145,79 @@ class TestRallyCases(unittest.TestCase):
             )
         self.assertTrue(any("Chạy ngầm ADB" in m for m in adv_logs))
 
+    def test_case_28_chat_scroll_bottom_purple_arrow_snap(self):
+        """Khi Chat lửng trên đáy có nút mũi tên tím '>>' -> Bấm thẳng '>>' về đáy (không bị lửng) và quét Rally mới nhất."""
+        # 1. Tạo frame Chat lửng trên đáy có nút tím '>>' ở góc dưới phải (X ~ 0.90, Y ~ 0.75)
+        chat_scrolled_up = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        chat_scrolled_up[int(self.gw_h * 0.73):int(self.gw_h * 0.77), int(self.gw_w * 0.88):int(self.gw_w * 0.93)] = (220, 60, 140)
+        btn_pt = rally._find_chat_scroll_bottom_button(chat_scrolled_up)
+        self.assertIsNotNone(btn_pt)
+        self.assertAlmostEqual(btn_pt[0] / self.gw_w, 0.905, delta=0.03)
+        self.assertAlmostEqual(btn_pt[1] / self.gw_h, 0.750, delta=0.03)
+
+        # Không có nút '>>' ở đáy sạch
+        chat_clean_bottom = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        self.assertIsNone(rally._find_chat_scroll_bottom_button(chat_clean_bottom))
+
+        # 2. Khi đang ở chế độ camp nhanh (allow_scroll=False) mà thấy '>>' -> bấm '>>' -> lộ ra Rally ở đáy -> vào Popup Join & Back
+        chat_at_bottom_with_rally = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        popup_frame = self._create_blank_frame()
+        self._draw_popup_card(popup_frame)
+        self._draw_purple_back_btn(popup_frame)
+        popup_frame[int(self.gw_h * 0.90):int(self.gw_h * 0.96), int(self.gw_w * 0.60):int(self.gw_w * 0.85)] = (30, 200, 30)
+
+        def mock_grab_snap(sct, mon):
+            if len(self.mock_adb.taps) == 0:
+                return make_mock_grab(chat_scrolled_up)(sct, mon)
+            if len(self.mock_adb.taps) == 1:
+                return make_mock_grab(chat_at_bottom_with_rally)(sct, mon)
+            return make_mock_grab(popup_frame)(sct, mon)
+
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=mock_grab_snap):
+            res = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+        self.assertEqual(res, "JOINED")
+        self.assertAlmostEqual(self.mock_adb.taps[0][0] / self.gw_w, 0.905, delta=0.04)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.750, delta=0.04)
+
+        # 3. Khi allow_scroll=True và vuốt lên 2 nhịp thấy '>>' -> nhảy thẳng xuống đáy bằng 1 tap '>>' (0 swipe xuống thừa)
+        self.mock_adb.clear()
+        def mock_grab_jump(sct, mon):
+            if len(self.mock_adb.swipes) == 0:
+                return make_mock_grab(chat_clean_bottom)(sct, mon)
+            if len(self.mock_adb.taps) == 0:
+                return make_mock_grab(chat_scrolled_up)(sct, mon)
+            return make_mock_grab(chat_clean_bottom)(sct, mon)
+
+        with patch("modules.rally.safe_grab", side_effect=mock_grab_jump):
+            res_jump = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=True)
+        self.assertEqual(res_jump, "NONE")
+        self.assertEqual(len(self.mock_adb.swipes), 2, "Chỉ vuốt lên 2 nhịp, không vuốt xuống vì đã có nút '>>'")
+        self.assertEqual(len(self.mock_adb.taps), 1, "Phải bấm 1 phát vào nút mũi tên tím '>>' để về đáy")
+
+        # 4. Kiểm tra trực tiếp trên 2 ảnh thật của người dùng (526f091b có '>>', eebec9e2 ở đáy sạch)
+        p_has = r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795752756716_526f091b.jpg"
+        p_bot = r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795752824340_eebec9e2.jpg"
+        if os.path.exists(p_has) and os.path.exists(p_bot):
+            raw_has = cv2.imread(p_has)
+            sh_h, sh_w = raw_has.shape[:2]
+            sc_h = max(sh_w / 443.0, sh_h / 761.0)
+            vp_h_raw = raw_has[int(32 * sc_h):sh_h, 0:sh_w - int(50 * sc_h)]
+            ox_h, rw_h = rally._detect_pillarbox(vp_h_raw)
+            vp_has = vp_h_raw[:, ox_h:ox_h + rw_h]
+            found_has = rally._find_chat_scroll_bottom_button(vp_has)
+            self.assertIsNotNone(found_has, "Ảnh 526f091b đang lửng trên đáy phải bắt được nút mũi tên tím '>>'")
+            self.assertAlmostEqual(found_has[0] / vp_has.shape[1], 0.925, delta=0.04)
+            self.assertAlmostEqual(found_has[1] / vp_has.shape[0], 0.760, delta=0.04)
+
+            raw_bot = cv2.imread(p_bot)
+            sb_h, sb_w = raw_bot.shape[:2]
+            sc_b = max(sb_w / 443.0, sb_h / 761.0)
+            vp_b_raw = raw_bot[int(32 * sc_b):sb_h, 0:sb_w - int(50 * sc_b)]
+            ox_b, rw_b = rally._detect_pillarbox(vp_b_raw)
+            vp_bot = vp_b_raw[:, ox_b:ox_b + rw_b]
+            self.assertIsNone(rally._find_chat_scroll_bottom_button(vp_bot), "Ảnh eebec9e2 đang ở đáy không được nhận nhầm nút '>>'")
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

@@ -1005,6 +1005,47 @@ def _find_chat_join_buttons(screen_crop: np.ndarray) -> List[Tuple[int, int]]:
     return buttons
 
 
+def _find_chat_scroll_bottom_button(screen_crop: np.ndarray) -> Optional[Tuple[int, int]]:
+    """
+    Tìm nút mũi tên kép màu tím ('>>' cuộn xuống đáy Chat) ở góc dưới phải khung tin nhắn.
+    Chỉ xuất hiện khi khung Chat đang lửng phía trên đáy (chưa cuộn xuống tin mới nhất).
+    """
+    if screen_crop is None or screen_crop.size == 0:
+        return None
+    gh, gw = screen_crop.shape[:2]
+    x1 = max(0, min(gw - 1, int(gw * getattr(config, "CHAT_SCROLL_BTN_REL_X_MIN", 0.840))))
+    x2 = max(x1 + 1, min(gw, int(gw * getattr(config, "CHAT_SCROLL_BTN_REL_X_MAX", 0.960))))
+    y1 = max(0, min(gh - 1, int(gh * getattr(config, "CHAT_SCROLL_BTN_REL_Y_MIN", 0.700))))
+    y2 = max(y1 + 1, min(gh, int(gh * getattr(config, "CHAT_SCROLL_BTN_REL_Y_MAX", 0.785))))
+
+    roi = screen_crop[y1:y2, x1:x2]
+    if roi.size == 0:
+        return None
+
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    lower_p = np.array(getattr(config, "HSV_CHAT_SCROLL_PURPLE_LOWER", [125, 80, 100]), dtype=np.uint8)
+    upper_p = np.array(getattr(config, "HSV_CHAT_SCROLL_PURPLE_UPPER", [160, 255, 255]), dtype=np.uint8)
+    purple_mask = cv2.inRange(hsv, lower_p, upper_p)
+    contours, _ = cv2.findContours(purple_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    min_w = max(8, int(gw * 0.025))
+    max_w = max(min_w + 1, int(gw * 0.110))
+    min_h = max(8, int(gh * 0.022))
+    max_h = max(min_h + 1, int(gh * 0.080))
+
+    best_pt: Optional[Tuple[int, int]] = None
+    best_area = 0
+    for c in contours:
+        cx, cy, bw, bh = cv2.boundingRect(c)
+        aspect = float(bw) / float(max(1, bh))
+        if min_w <= bw <= max_w and min_h <= bh <= max_h and 0.35 <= aspect <= 1.35:
+            area = bw * bh
+            if area > best_area:
+                best_area = area
+                best_pt = (int(x1 + cx + bw // 2), int(y1 + cy + bh // 2))
+    return best_pt
+
+
 def _close_chat_if_open(
     sct: mss.MSS,
     vp: Tuple[int, int, int, int],
@@ -1178,18 +1219,34 @@ def scan_and_join_chat_rallies(
         sig = _extract_chat_card_signature(frame, btns[0][1])
         return _tap_chat_join_and_handle_popup(sct, vp, adb, btns[0], stop_event, log_cb, card_sig=sig)
 
+    # Nếu đang bị kẹt lửng phía trên đáy (có nút tím '>>' cuộn xuống đáy) -> bấm ngay về đáy rồi quét lại
+    scroll_bot_btn = _find_chat_scroll_bottom_button(frame)
+    if scroll_bot_btn is not None:
+        _adb_tap(adb, vp, gw_l + scroll_bot_btn[0], gw_t + scroll_bot_btn[1], "Bấm mũi tên tím về đáy Chat", log_cb)
+        if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_SCROLL_CLICK", 0.45)), stop_event):
+            return "STOPPED"
+        bot_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+        if bot_frame is not None and _is_chat_open(bot_frame):
+            bot_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(bot_frame), bot_frame, gw_h)
+            if bot_btns:
+                if log_cb:
+                    log_cb("Dune Chat: Thấy Rally ở đáy sau khi bấm mũi tên tím -> Bấm Tham gia")
+                bot_sig = _extract_chat_card_signature(bot_frame, bot_btns[0][1])
+                return _tap_chat_join_and_handle_popup(sct, vp, adb, bot_btns[0], stop_event, log_cb, card_sig=bot_sig)
+
     if not allow_scroll:
         return "NONE"
 
-    # Nhịp 2: Vuốt lên (kéo ngón tay từ trên xuống) để soi các Rally vừa bị trôi lên trên
+    # Nhịp 2: Vuốt lên êm (kéo ngón tay từ trên xuống) để soi các Rally vừa bị trôi lên trên
     scroll_steps = int(getattr(config, "RALLY_CHAT_SCROLL_UP_STEPS", 2))
     swipe_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_SWIPE_X", 0.560))
-    top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_TOP_Y", 0.280))
-    bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_BOTTOM_Y", 0.720))
-    swipe_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DURATION_MS", 280))
+    top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_TOP_Y", 0.300))
+    bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_BOTTOM_Y", 0.660))
+    swipe_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DURATION_MS", 480))
     scroll_delay = float(getattr(config, "RALLY_DELAY_AFTER_CHAT_SCROLL", 0.45))
 
     swiped_up = 0
+    last_up_frame: Optional[np.ndarray] = None
     for step in range(scroll_steps):
         if stop_event.is_set():
             return "STOPPED"
@@ -1201,6 +1258,7 @@ def scan_and_join_chat_rallies(
         up_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
         if up_frame is None or not _is_chat_open(up_frame):
             break
+        last_up_frame = up_frame
         up_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(up_frame), up_frame, gw_h)
         if up_btns:
             if log_cb:
@@ -1208,13 +1266,38 @@ def scan_and_join_chat_rallies(
             up_sig = _extract_chat_card_signature(up_frame, up_btns[0][1])
             return _tap_chat_join_and_handle_popup(sct, vp, adb, up_btns[0], stop_event, log_cb, card_sig=up_sig)
 
-    # Nhịp 3: Vuốt xuống lại đáy Chat (kéo ngón tay từ dưới lên) để luôn chốt lại ở tin mới nhất
-    for step in range(swiped_up):
-        if stop_event.is_set():
+    # Nhịp 3: Ưu tiên bấm nút mũi tên tím '>>' nhảy thẳng xuống tận đáy nếu có (tránh bị lửng khi có tin mới);
+    # nếu không thấy nút '>>' mới fallback vuốt xuống lại.
+    jump_btn = _find_chat_scroll_bottom_button(last_up_frame) if last_up_frame is not None else None
+    if jump_btn is not None:
+        _adb_tap(adb, vp, gw_l + jump_btn[0], gw_t + jump_btn[1], "Bấm mũi tên tím nhảy thẳng xuống đáy Chat", log_cb)
+        if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_SCROLL_CLICK", 0.45)), stop_event):
             return "STOPPED"
-        _adb_swipe(adb, vp, swipe_x, bot_y, swipe_x, top_y, swipe_ms, f"Vuốt xuống lại đáy Chat ({step + 1}/{swiped_up})", log_cb)
-        if _sleep(scroll_delay, stop_event):
-            return "STOPPED"
+    else:
+        for step in range(swiped_up):
+            if stop_event.is_set():
+                return "STOPPED"
+            _adb_swipe(adb, vp, swipe_x, bot_y, swipe_x, top_y, swipe_ms, f"Vuốt xuống lại đáy Chat ({step + 1}/{swiped_up})", log_cb)
+            if _sleep(scroll_delay, stop_event):
+                return "STOPPED"
+        # Chốt kiểm tra lần cuối sau vuốt xuống: nếu vẫn còn nút '>>' (do tin mới trôi vào) thì bấm luôn
+        after_down = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+        if after_down is not None and _is_chat_open(after_down):
+            rem_btn = _find_chat_scroll_bottom_button(after_down)
+            if rem_btn is not None:
+                _adb_tap(adb, vp, gw_l + rem_btn[0], gw_t + rem_btn[1], "Bấm mũi tên tím chốt đáy Chat", log_cb)
+                if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_SCROLL_CLICK", 0.45)), stop_event):
+                    return "STOPPED"
+
+    # Kiểm tra nhanh đáy Chat một lần sau khi vừa về đáy (bắt kèo mới rơi vào đúng lúc cuộn)
+    end_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+    if end_frame is not None and _is_chat_open(end_frame):
+        end_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(end_frame), end_frame, gw_h)
+        if end_btns:
+            if log_cb:
+                log_cb("Dune Chat: Phát hiện Rally mới ở đáy sau khi cuộn về -> Bấm Tham gia")
+            end_sig = _extract_chat_card_signature(end_frame, end_btns[0][1])
+            return _tap_chat_join_and_handle_popup(sct, vp, adb, end_btns[0], stop_event, log_cb, card_sig=end_sig)
 
     return "NONE"
 

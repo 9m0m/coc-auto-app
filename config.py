@@ -197,16 +197,22 @@ RALLY_CHAT_CARD_PURPLE_MIN_RATIO: float = 0.12
 HSV_CHAT_CARD_GOLD_LOWER = [12, 80, 100]
 HSV_CHAT_CARD_GOLD_UPPER = [34, 255, 255]
 
-# Thông số vuốt chống trôi tin nhắn trong Chat (Vuốt lên xem tin cũ -> Vuốt xuống về đáy)
+# Thông số vuốt chống trôi tin nhắn trong Chat (Vuốt êm vừa phải tránh fling nhảy cóc thẻ Rally)
 RALLY_CHAT_SWIPE_X: float = 0.560
-RALLY_CHAT_SWIPE_TOP_Y: float = 0.280
-RALLY_CHAT_SWIPE_BOTTOM_Y: float = 0.720
-RALLY_CHAT_SWIPE_DURATION_MS: int = 280
+RALLY_CHAT_SWIPE_TOP_Y: float = 0.300
+RALLY_CHAT_SWIPE_BOTTOM_Y: float = 0.660
+RALLY_CHAT_SWIPE_DURATION_MS: int = 480
 RALLY_CHAT_SCROLL_UP_STEPS: int = 2
 
 # Nút mũi tên tím cuộn xuống tin nhắn mới nhất trong Chat (góc dưới phải)
 CHAT_SCROLL_BOTTOM_X: float = 0.915
 CHAT_SCROLL_BOTTOM_Y: float = 0.772
+CHAT_SCROLL_BTN_REL_X_MIN: float = 0.840
+CHAT_SCROLL_BTN_REL_X_MAX: float = 0.960
+CHAT_SCROLL_BTN_REL_Y_MIN: float = 0.700
+CHAT_SCROLL_BTN_REL_Y_MAX: float = 0.785
+HSV_CHAT_SCROLL_PURPLE_LOWER = [125, 80, 100]
+HSV_CHAT_SCROLL_PURPLE_UPPER = [160, 255, 255]
 
 # Chu kỳ & độ trễ riêng cho chế độ Dune (Camp cố định trong Chat Liên Minh)
 RALLY_DELAY_AFTER_CHAT_OPEN: float = 0.95
