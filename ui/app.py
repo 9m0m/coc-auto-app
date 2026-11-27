@@ -114,9 +114,10 @@ class HelpDialog(ctk.CTkToplevel):
             text_color="#38bdf8",
         ).pack(anchor="w", padx=14, pady=(8, 3))
         txt2 = (
-            "• Không thu nhỏ (minimize) giả lập xuống taskbar vì Windows sẽ ngắt\n"
-            "  luồng đồ họa. Bạn chỉ cần để các cửa sổ khác đè lên trên thoải mái.\n"
-            "• 2 Màn hình: Đặt trọn giả lập ở 1 màn, tránh kéo lệch ranh giới 2 màn."
+            "• Chế độ Hiển thị (MSS) & Auto Câu Cá: KHÔNG thu nhỏ (minimize) và\n"
+            "  không để cửa sổ khác che mất vùng game vì tool đọc trực tiếp từ màn hình.\n"
+            "• Rally / Phiêu Lưu: Có thể bật 'Chạy ngầm (ADB)' để che hoặc thu nhỏ\n"
+            "  (nhớ tắt Eco Mode của BlueStacks để game không bị đóng băng khung hình)."
         )
         ctk.CTkLabel(
             f2, text=txt2, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
@@ -179,8 +180,8 @@ class AutoApp(ctk.CTk):
 
         # Thiết lập cửa sổ chính
         self.title("COC AutoMaster")
-        self.geometry("520x780")
-        self.minsize(480, 660)
+        self.geometry("520x840")
+        self.minsize(480, 720)
         self.resizable(True, True)
         
         # Gam màu nền Slate trung tính dịu mắt (#0c1017)
@@ -205,8 +206,10 @@ class AutoApp(ctk.CTk):
         self.is_running = False
         self.selected_mode = "rally"
         self.rally_mode = "map"             # "map" (Gold Rush thường) hoặc "dune" (Sa Hải Dune - Chat)
+        self.capture_mode = "mss"           # "mss" (siêu tốc, không che) hoặc "adb" (chạy ngầm cho Rally/Phiêu Lưu)
         self.fishing_click_mode = "mouse"  # "mouse" (Win32 siêu tốc 0.02s) hoặc "adb" (ADB ngầm)
         self.card_rally_options = None
+        self.card_capture_options = None
         self.card_fishing_options = None
 
         # Khởi tạo các thành phần giao diện chuẩn Slate & Blue
@@ -214,6 +217,7 @@ class AutoApp(ctk.CTk):
         self._build_device_card()
         self._build_mode_selector()
         self._build_rally_options()
+        self._build_capture_options()
         self._build_fishing_options()
         self._build_action_controls()
         self._build_terminal_log()
@@ -531,6 +535,87 @@ class AutoApp(ctk.CTk):
             self.lbl_mode_status.configure(text="● Auto Rally (Sa Hải Dune)")
             self.log("Chế độ Rally: Sa Hải Dune (Quét Chat Liên Minh)")
 
+    def _build_capture_options(self):
+        """Khung tùy chọn chế độ đọc màn hình (Hiển thị MSS vs Chạy ngầm ADB) cho Rally & Phiêu Lưu."""
+        self.card_capture_options = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color="#151c28",
+            border_width=1,
+            border_color="#243044",
+        )
+        self.card_capture_options.pack(fill="x", padx=24, pady=4)
+
+        capsule = ctk.CTkFrame(
+            self.card_capture_options,
+            corner_radius=8,
+            fg_color="#090d15",
+            border_width=1,
+            border_color="#1e2738",
+        )
+        capsule.pack(fill="x", padx=12, pady=(8, 4))
+
+        inner_row = ctk.CTkFrame(capsule, fg_color="transparent")
+        inner_row.pack(fill="x", padx=3, pady=3)
+
+        self.btn_cap_mss = ctk.CTkButton(
+            inner_row,
+            text="Hiển thị (Nhanh - MSS)",
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            fg_color="#0284c7",
+            hover_color="#0369a1",
+            corner_radius=6,
+            text_color="#ffffff",
+            command=lambda: self._set_capture_mode("mss"),
+        )
+        self.btn_cap_mss.pack(side="left", fill="x", expand=True, padx=2)
+
+        self.btn_cap_adb = ctk.CTkButton(
+            inner_row,
+            text="Chạy ngầm (ADB - Che/Ẩn)",
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            fg_color="transparent",
+            hover_color="#182030",
+            corner_radius=6,
+            text_color="#94a3b8",
+            command=lambda: self._set_capture_mode("adb"),
+        )
+        self.btn_cap_adb.pack(side="left", fill="x", expand=True, padx=2)
+
+        self.lbl_capture_note = ctk.CTkLabel(
+            self.card_capture_options,
+            text="⚡ Quét siêu tốc 5ms qua màn hình. Không minimize hay để cửa sổ khác che giả lập.",
+            font=ctk.CTkFont(family="Segoe UI", size=10),
+            text_color="#38bdf8",
+            anchor="w",
+            justify="left",
+        )
+        self.lbl_capture_note.pack(fill="x", padx=14, pady=(0, 6))
+
+    def _set_capture_mode(self, cmode: str):
+        """Chuyển đổi giữa chụp màn hình trực tiếp MSS và chụp ngầm ADB."""
+        if self.is_running:
+            return
+        self.capture_mode = cmode
+        if cmode == "mss":
+            self.btn_cap_mss.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
+            self.btn_cap_adb.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
+            self.lbl_capture_note.configure(
+                text="⚡ Quét siêu tốc 5ms qua màn hình. Không minimize hay để cửa sổ khác che giả lập.",
+                text_color="#38bdf8",
+            )
+            self.log("Chế độ đọc màn hình: Hiển thị (Nhanh - MSS)")
+        else:
+            self.btn_cap_mss.configure(fg_color="transparent", hover_color="#182030", text_color="#94a3b8")
+            self.btn_cap_adb.configure(fg_color="#0284c7", hover_color="#0369a1", text_color="#ffffff")
+            self.lbl_capture_note.configure(
+                text="🛡️ Chụp ngầm từ Android (~0.4s/nhịp). Che cửa sổ hoặc thu nhỏ đều chạy (tắt Eco Mode).",
+                text_color="#94a3b8",
+            )
+            self.log("Chế độ đọc màn hình: Chạy ngầm (ADB - Hỗ trợ che/thu nhỏ)")
+
     def _build_fishing_options(self):
         """Khung tùy chọn cơ chế click riêng cho Auto Câu Cá (Chiếm chuột vs Click ảo)."""
         self.card_fishing_options = ctk.CTkFrame(
@@ -644,6 +729,9 @@ class AutoApp(ctk.CTk):
                 self.card_fishing_options.pack_forget()
             if self.card_rally_options:
                 self.card_rally_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
+            if self.card_capture_options:
+                anchor = self.card_rally_options if self.card_rally_options else self.card_mode
+                self.card_capture_options.pack(fill="x", padx=24, pady=4, after=anchor)
             self.log(f"Chuyển chế độ: Auto Rally ({rally_desc})")
         elif mode == "fishing":
             self.btn_mode_fishing.configure(**active_cfg)
@@ -651,6 +739,8 @@ class AutoApp(ctk.CTk):
             self.lbl_mode_status.configure(text=f"● Auto Câu Cá ({mode_desc})")
             if self.card_rally_options:
                 self.card_rally_options.pack_forget()
+            if self.card_capture_options:
+                self.card_capture_options.pack_forget()
             if self.card_fishing_options:
                 self.card_fishing_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
             self.log(f"Chuyển chế độ: Auto Câu Cá ({mode_desc})")
@@ -661,6 +751,8 @@ class AutoApp(ctk.CTk):
                 self.card_rally_options.pack_forget()
             if self.card_fishing_options:
                 self.card_fishing_options.pack_forget()
+            if self.card_capture_options:
+                self.card_capture_options.pack(fill="x", padx=24, pady=4, after=self.card_mode)
             self.log("Chuyển chế độ: Auto Phiêu Lưu")
 
     def _build_action_controls(self):
@@ -857,6 +949,8 @@ class AutoApp(ctk.CTk):
         self.btn_mode_adventure.configure(state="disabled")
         self.btn_rally_map.configure(state="disabled")
         self.btn_rally_dune.configure(state="disabled")
+        self.btn_cap_mss.configure(state="disabled")
+        self.btn_cap_adb.configure(state="disabled")
 
         mode = self.selected_mode
         rally_desc = "Sa Hải Dune" if self.rally_mode == "dune" else "Map Thường"
@@ -876,6 +970,7 @@ class AutoApp(ctk.CTk):
                         self.stop_event,
                         self.log,
                         rally_mode=self.rally_mode,
+                        capture_mode=self.capture_mode,
                     )
                 elif mode == "fishing":
                     run_fishing_loop(
@@ -886,7 +981,13 @@ class AutoApp(ctk.CTk):
                         click_mode=self.fishing_click_mode,
                     )
                 elif mode == "adventure":
-                    run_adventure_loop(self.adb, self.get_current_viewport, self.stop_event, self.log)
+                    run_adventure_loop(
+                        self.adb,
+                        self.get_current_viewport,
+                        self.stop_event,
+                        self.log,
+                        capture_mode=self.capture_mode,
+                    )
             except Exception as e:
                 self.log(f"[Lỗi tiến trình] {e}")
             finally:
@@ -913,6 +1014,8 @@ class AutoApp(ctk.CTk):
         self.btn_mode_adventure.configure(state="normal")
         self.btn_rally_map.configure(state="normal")
         self.btn_rally_dune.configure(state="normal")
+        self.btn_cap_mss.configure(state="normal")
+        self.btn_cap_adb.configure(state="normal")
         self.log("⏹ Đã dừng hoạt động.")
 
     def on_closing(self):

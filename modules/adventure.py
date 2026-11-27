@@ -15,7 +15,7 @@ import mss
 import config
 import assets
 from core.viewport import screen_to_android
-from core.vision import safe_grab
+from core.vision import safe_grab, create_capture_session, make_adb_viewport_getter
 from core.adb_manager import ADBManager
 
 _templates: Optional[Dict[str, np.ndarray]] = None
@@ -227,10 +227,13 @@ def run_adventure_loop(
     get_vp_func: Callable[[], Optional[Tuple[int, int, int, int]]],
     stop_event: threading.Event,
     log_cb: Callable[[str], None],
+    capture_mode: str = "mss",
 ):
-    """Vòng lặp chính của Auto Phiêu Lưu."""
-    log_cb("Khởi động Auto Phiêu Lưu Cổ Vật...")
-    sct = mss.mss()
+    """Vòng lặp chính của Auto Phiêu Lưu (hỗ trợ 'mss' và 'adb' chạy ngầm)."""
+    cap_desc = "Chạy ngầm ADB" if capture_mode == "adb" else "Hiển thị MSS"
+    log_cb(f"Khởi động Auto Phiêu Lưu Cổ Vật ({cap_desc})...")
+    sct = create_capture_session(adb, capture_mode)
+    active_get_vp = make_adb_viewport_getter(sct, adb) if capture_mode == "adb" else get_vp_func
 
     runs_count = 0
     advances_count = 0
@@ -240,7 +243,7 @@ def run_adventure_loop(
     same_state_count = 0
 
     while not stop_event.is_set():
-        vp = get_vp_func()
+        vp = active_get_vp()
         if not vp:
             log_cb("Chờ phát hiện cửa sổ game...")
             _sleep(1.0, stop_event)

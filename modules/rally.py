@@ -15,7 +15,7 @@ import mss
 import config
 import assets
 from core.viewport import get_game_viewport, screen_to_android
-from core.vision import safe_grab
+from core.vision import safe_grab, create_capture_session, make_adb_viewport_getter
 from core.adb_manager import ADBManager
 
 # Quản lý trạng thái nội bộ của Rally
@@ -1225,6 +1225,7 @@ def _run_dune_chat_loop(
     get_vp_func: Callable[[], Optional[Tuple[int, int, int, int]]],
     stop_event: threading.Event,
     log_cb: Callable[[str], None],
+    capture_mode: str = "mss",
 ) -> None:
     """
     Vòng lặp chuyên dụng cho Sa Hải Dune (Camp cố định 100% trong Chat Liên Minh):
@@ -1234,7 +1235,9 @@ def _run_dune_chat_loop(
       rồi lập tức mở lại Chat để camp tiếp.
     """
     drift_interval = float(getattr(config, "RALLY_DUNE_DRIFT_SCROLL_INTERVAL", 8.0))
+    warn_streak = int(getattr(config, "RALLY_DUNE_CHAT_OPEN_WARN_STREAK", 5))
     last_drift_scroll = time.time()
+    chat_open_fail_streak = 0
 
     while not stop_event.is_set():
         raw_vp = get_vp_func()
@@ -1259,21 +1262,32 @@ def _run_dune_chat_loop(
                 sct, vp, adb, stop_event, log_cb, allow_type_d_close_x=False
             )
             if is_pop:
+                chat_open_fail_streak = 0
                 if is_join:
                     log_cb("Dune: Đã xử lý popup & tham gia Rally -> Vào lại Chat camp tiếp")
                 _sleep(0.45, stop_event)
                 continue
 
             if _check_and_claim_reward(sct, vp, adb, stop_event, log_cb):
+                chat_open_fail_streak = 0
                 continue
 
             # 2. Mở lại khung Chat Liên Minh để đứng camp cố định
             chat_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_ICON_X", 0.927))
             chat_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_ICON_Y", 0.770))
             _adb_tap(adb, vp, chat_x, chat_y, "Mở khung Chat Liên Minh để camp", log_cb)
+            chat_open_fail_streak += 1
+            if chat_open_fail_streak >= warn_streak:
+                if capture_mode == "mss":
+                    log_cb("⚠️ Không thấy khung Chat sau nhiều lần mở -> Kiểm tra cửa sổ tool/app khác có đang che góc dưới phải giả lập không (hoặc chuyển sang 'Chạy ngầm ADB').")
+                else:
+                    log_cb("⚠️ Không thấy khung Chat sau nhiều lần mở -> Kiểm tra xem game có đang đứng ở Mapview hay bị BlueStacks Eco Mode đóng băng khi thu nhỏ.")
+                chat_open_fail_streak = 0
             if _sleep(getattr(config, "RALLY_DELAY_AFTER_CHAT_OPEN", 0.95), stop_event):
                 break
             last_drift_scroll = time.time()
+        else:
+            chat_open_fail_streak = 0
 
         # 3. Quét nhanh đáy Chat; định kỳ mỗi drift_interval mới vuốt lên/xuống bắt Rally bị trôi
         now = time.time()
@@ -1301,23 +1315,26 @@ def run_rally_loop(
     stop_event: threading.Event,
     log_cb: Callable[[str], None],
     rally_mode: str = "map",
+    capture_mode: str = "mss",
 ):
-    """Vòng lặp chạy chính của Auto Rally (hỗ trợ 'map' Gold Rush thường và 'dune' Chat Liên Minh)."""
+    """Vòng lặp chạy chính của Auto Rally (hỗ trợ 'map' Gold Rush thường / 'dune' Chat Liên Minh và 'mss' / 'adb')."""
     reset_rally_state()
-    sct = mss.mss()
+    sct = create_capture_session(adb, capture_mode)
+    active_get_vp = make_adb_viewport_getter(sct, adb) if capture_mode == "adb" else get_vp_func
+    cap_desc = "Chạy ngầm ADB" if capture_mode == "adb" else "Hiển thị MSS"
 
     if rally_mode == "dune":
-        log_cb("Khởi động Auto Rally - Sa Hải Dune (Quét Chat Liên Minh)...")
-        _run_dune_chat_loop(sct, adb, get_vp_func, stop_event, log_cb)
+        log_cb(f"Khởi động Auto Rally - Sa Hải Dune (Quét Chat Liên Minh • {cap_desc})...")
+        _run_dune_chat_loop(sct, adb, active_get_vp, stop_event, log_cb, capture_mode=capture_mode)
         log_cb("Đã dừng Auto Rally (Dune).")
         return
 
-    log_cb("Khởi động Auto Rally (Tổng Tấn Công - Map Thường)...")
+    log_cb(f"Khởi động Auto Rally (Tổng Tấn Công - Map Thường • {cap_desc})...")
     is_first_cycle = True
     last_zoom_check = 0.0
 
     while not stop_event.is_set():
-        raw_vp = get_vp_func()
+        raw_vp = active_get_vp()
         if not raw_vp:
             log_cb("Chờ phát hiện cửa sổ game...")
             _sleep(1.0, stop_event)

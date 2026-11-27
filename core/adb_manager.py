@@ -6,9 +6,14 @@ Hỗ trợ tự động dò tìm cổng của BlueStacks 5, LDPlayer, MuMu Playe
 import os
 import sys
 import re
+import time
+import struct
 import subprocess
 import winreg
 from typing import Optional, List, Dict, Tuple
+
+import cv2
+import numpy as np
 
 
 def get_base_dir() -> str:
@@ -93,6 +98,8 @@ class ADBManager:
         self.active_serial: Optional[str] = None
         self.screen_size: Optional[Tuple[int, int]] = None  # (width, height)
         self.last_error: str = ""
+        self.last_input_time: float = 0.0
+        self.input_seq: int = 0
 
     def run_cmd(self, args: List[str], timeout: float = 5.0) -> Tuple[int, str]:
         """Chạy một lệnh ADB và trả về (exit_code, output).
@@ -343,6 +350,8 @@ class ADBManager:
         )
         if code == 0:
             self.last_error = ""
+            self.last_input_time = time.time()
+            self.input_seq += 1
             return True
 
         # 2. Fallback: Nếu không gửi được, thử với quyền root (su) cho LDPlayer / giả lập bật Root
@@ -351,6 +360,8 @@ class ADBManager:
         )
         if code_su == 0:
             self.last_error = ""
+            self.last_input_time = time.time()
+            self.input_seq += 1
             return True
 
         # 3. Fallback 2: Thử su -c
@@ -359,6 +370,8 @@ class ADBManager:
         )
         if code_su2 == 0:
             self.last_error = ""
+            self.last_input_time = time.time()
+            self.input_seq += 1
             return True
 
         self.last_error = out or out_su or out_su2 or "Không nhận được phản hồi từ ADB"
@@ -386,6 +399,8 @@ class ADBManager:
         )
         if code == 0:
             self.last_error = ""
+            self.last_input_time = time.time()
+            self.input_seq += 1
             return True
 
         # Fallback qua su
@@ -407,7 +422,56 @@ class ADBManager:
         )
         if code_su == 0:
             self.last_error = ""
+            self.last_input_time = time.time()
+            self.input_seq += 1
             return True
 
         self.last_error = out or out_su or "Không nhận được phản hồi từ ADB"
         return False
+
+    def capture_screen(self, timeout: float = 4.0) -> Optional[np.ndarray]:
+        """Chụp toàn màn hình Android trực tiếp qua ADB (hỗ trợ che khuất/minimize cửa sổ).
+        Ưu tiên 'exec-out screencap -p' (PNG), dự phòng raw RGBA (header 16-byte hoặc 12-byte).
+        """
+        if not self.active_serial:
+            return None
+
+        flags = 0x08000000 if sys.platform.startswith("win") else 0
+        try:
+            proc = subprocess.run(
+                [self.adb_bin, "-s", self.active_serial, "exec-out", "screencap", "-p"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=flags,
+                timeout=timeout,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                buf = np.frombuffer(proc.stdout, dtype=np.uint8)
+                decoded = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+                if decoded is not None and decoded.size > 0:
+                    return decoded
+        except Exception as e:
+            self.last_error = str(e)
+
+        # Fallback: đọc framebuffer thô (exec-out screencap) không nén PNG
+        try:
+            proc_raw = subprocess.run(
+                [self.adb_bin, "-s", self.active_serial, "exec-out", "screencap"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=flags,
+                timeout=timeout,
+            )
+            raw_bytes = proc_raw.stdout
+            if proc_raw.returncode == 0 and len(raw_bytes) >= 16:
+                w, h, _fmt = struct.unpack("<III", raw_bytes[:12])
+                payload_len = w * h * 4
+                if w > 0 and h > 0:
+                    header_sz = 16 if len(raw_bytes) == payload_len + 16 else (12 if len(raw_bytes) == payload_len + 12 else 0)
+                    if header_sz > 0:
+                        rgba = np.frombuffer(raw_bytes, dtype=np.uint8, offset=header_sz).reshape((h, w, 4))
+                        return cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
+        except Exception as e:
+            self.last_error = str(e)
+
+        return None

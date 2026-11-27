@@ -217,6 +217,11 @@ RALLY_DUNE_DRIFT_SCROLL_INTERVAL: float = 8.0
 RALLY_DUNE_TAP_COOLDOWN: float = 8.0
 RALLY_DUNE_FULL_CARD_COOLDOWN: float = 45.0
 RALLY_DUNE_CARD_DIFF_THRESHOLD: float = 12.0
+RALLY_DUNE_CHAT_OPEN_WARN_STREAK: int = 5
+
+# Chế độ chụp ngầm ADB (cho Auto Rally & Auto Phiêu Lưu khi che/minimize giả lập)
+ADB_SCREENCAP_TIMEOUT: float = 4.0
+ADB_CAPTURE_CACHE_TTL: float = 0.35
 
 # D. Dải màu & ngưỡng nhận diện cho Rally
 # Nút "Tham gia" màu xanh lá (Nút thật có > 12.000 px, ngưỡng 2500 loại bỏ 100% icon Mapview)

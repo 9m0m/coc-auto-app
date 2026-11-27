@@ -1049,6 +1049,102 @@ class TestRallyCases(unittest.TestCase):
             self.assertEqual(len(btns_ee), 1, "Ảnh thật Cồn Cát(28, 14) phải bắt được đúng 1 nút Tham gia")
             self.assertAlmostEqual(btns_ee[0][1] / img_ee.shape[0], 0.731, delta=0.04)
 
+    def test_case_27_adb_background_capture_session_and_chat_warn(self):
+        """Chế độ Chạy ngầm ADB: ADBCaptureSession cắt đúng ROI từ frame Android, làm mới sau input, và chạy được Rally/Adventure."""
+        from core.vision import ADBCaptureSession, safe_grab, make_adb_viewport_getter
+        from modules import adventure
+
+        chat_with_rally = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+
+        class MockADBWithCap(MockADB):
+            def __init__(self, frame):
+                super().__init__(screen_size=(frame.shape[1], frame.shape[0]))
+                self._frame = frame
+                self.capture_calls = 0
+                self.last_input_time = 0.0
+                self.input_seq = 0
+
+            def capture_screen(self, timeout: float = 4.0):
+                self.capture_calls += 1
+                return self._frame.copy()
+
+            def tap(self, x: int, y: int):
+                super().tap(x, y)
+                import time as _t
+                self.last_input_time = _t.time()
+                self.input_seq += 1
+
+        adb_cap = MockADBWithCap(chat_with_rally)
+        sct = ADBCaptureSession(adb_cap, cache_ttl=5.0)
+        vp_fn = make_adb_viewport_getter(sct, adb_cap)
+        vp = vp_fn()
+        self.assertEqual(vp, (0, 0, self.gw_w, self.gw_h))
+        self.assertEqual(adb_cap.capture_calls, 1)
+
+        # Nhiều lần safe_grab trong cùng 1 nhịp phải dùng lại cache RAM (không gọi ADB thừa)
+        c1 = safe_grab(sct, {"left": 0, "top": 0, "width": self.gw_w, "height": self.gw_h})
+        c2 = safe_grab(sct, {"left": 100, "top": 100, "width": 200, "height": 200})
+        self.assertIsNotNone(c1)
+        self.assertIsNotNone(c2)
+        self.assertEqual(c1.shape, (self.gw_h, self.gw_w, 3))
+        self.assertEqual(c2.shape, (200, 200, 3))
+        self.assertEqual(adb_cap.capture_calls, 1)
+
+        # Sau khi tap(), last_input_time > _frame_time -> lần grab kế tiếp tự động chụp ảnh mới
+        adb_cap.tap(10, 10)
+        c3 = safe_grab(sct, {"left": 0, "top": 0, "width": self.gw_w, "height": self.gw_h})
+        self.assertIsNotNone(c3)
+        self.assertEqual(adb_cap.capture_calls, 2)
+
+        # Chạy thử 1 nhịp run_rally_loop(capture_mode='adb', rally_mode='dune') phát hiện được nút Tham gia mà không dùng get_vp_func
+        logs = []
+        popup_frame = self._create_blank_frame()
+        self._draw_popup_card(popup_frame)
+        self._draw_purple_back_btn(popup_frame)
+        popup_frame[int(self.gw_h * 0.90):int(self.gw_h * 0.96), int(self.gw_w * 0.60):int(self.gw_w * 0.85)] = (30, 200, 30)
+
+        adb_cap.clear()
+        adb_cap.capture_calls = 0
+
+        def _mock_cap_seq(timeout=4.0):
+            adb_cap.capture_calls += 1
+            if len(adb_cap.taps) == 0:
+                return chat_with_rally.copy()
+            if len(adb_cap.taps) >= 3:
+                self.stop_event.set()
+            return popup_frame.copy()
+
+        adb_cap.capture_screen = _mock_cap_seq
+        rally.run_rally_loop(
+            adb_cap,
+            lambda: None,  # Cố tình trả None để chứng minh chế độ ADB không phụ thuộc cửa sổ Windows!
+            self.stop_event,
+            logs.append,
+            rally_mode="dune",
+            capture_mode="adb",
+        )
+        self.assertGreaterEqual(len(adb_cap.taps), 3)
+        self.assertTrue(any("Chạy ngầm ADB" in m for m in logs))
+
+        # Chạy thử 1 nhịp run_adventure_loop(capture_mode='adb') không crash khi không có cửa sổ Windows
+        self.stop_event.clear()
+        adv_logs = []
+
+        def _adv_cap(timeout=4.0):
+            self.stop_event.set()
+            return self._create_blank_frame()
+
+        adb_cap.capture_screen = _adv_cap
+        with patch("modules.adventure._sleep", return_value=True):
+            adventure.run_adventure_loop(
+                adb_cap,
+                lambda: None,
+                self.stop_event,
+                adv_logs.append,
+                capture_mode="adb",
+            )
+        self.assertTrue(any("Chạy ngầm ADB" in m for m in adv_logs))
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)
