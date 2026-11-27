@@ -30,17 +30,19 @@ _effective_vp: Optional[Tuple[int, int, int, int]] = None
 _last_raw_vp: Optional[Tuple[int, int, int, int]] = None
 _last_pillarbox_check: float = 0.0
 _consecutive_reward_claims: int = 0
+_last_skip_log_time: float = 0.0
 
 
 def reset_rally_state() -> None:
     """Xóa sạch bộ nhớ tạm và cooldown khi bắt đầu phiên chạy mới."""
-    global _full_tiles_cooldown, _recently_joined_tiles, _chat_failed_y_cooldown, _chat_full_cards_cooldown, _last_clicked_tile, _consecutive_reward_claims
+    global _full_tiles_cooldown, _recently_joined_tiles, _chat_failed_y_cooldown, _chat_full_cards_cooldown, _last_clicked_tile, _consecutive_reward_claims, _last_skip_log_time
     _full_tiles_cooldown.clear()
     _recently_joined_tiles.clear()
     _chat_failed_y_cooldown.clear()
     _chat_full_cards_cooldown.clear()
     _last_clicked_tile = None
     _consecutive_reward_claims = 0
+    _last_skip_log_time = 0.0
 
 
 def _sleep(seconds: float, stop_event: threading.Event, jitter: bool = True) -> bool:
@@ -990,13 +992,14 @@ def _find_chat_join_buttons(screen_crop: np.ndarray) -> List[Tuple[int, int]]:
     min_h = max(12, int(gh * getattr(config, "RALLY_CHAT_BTN_MIN_H_RATIO", 0.015)))
     max_h = max(35, int(gh * getattr(config, "RALLY_CHAT_BTN_MAX_H_RATIO", 0.065)))
     min_aspect = float(getattr(config, "RALLY_CHAT_BTN_MIN_ASPECT", 2.5))
+    tap_y_ratio = float(getattr(config, "RALLY_CHAT_BTN_TAP_Y_RATIO", 0.44))
 
     buttons: List[Tuple[int, int]] = []
     for c in contours:
         cx, cy, bw, bh = cv2.boundingRect(c)
         if bw >= min_w and min_h <= bh <= max_h and (float(bw) / float(max(1, bh))) >= min_aspect:
             btn_cx = int(x1 + cx + bw // 2)
-            btn_cy = int(y1 + cy + bh // 2)
+            btn_cy = int(y1 + cy + int(bh * tap_y_ratio))
             if _has_purple_rally_card_above(screen_crop, btn_cy):
                 buttons.append((btn_cx, btn_cy))
 
@@ -1105,22 +1108,30 @@ def _filter_chat_buttons_by_cooldown(
     buttons: List[Tuple[int, int]],
     screen_crop: np.ndarray,
     gw_h: int,
+    log_cb: Optional[Callable[[str], None]] = None,
 ) -> List[Tuple[int, int]]:
     """
     Loại bỏ các thẻ Rally đã đầy (lag state 4/4 vẫn hiện nút xanh) theo chữ ký thẻ 45s
     và fallback khóa vị trí Y trong 8s để tránh bấm lặp liên tục.
     """
-    global _chat_failed_y_cooldown
+    global _chat_failed_y_cooldown, _last_skip_log_time
     now = time.time()
     _chat_failed_y_cooldown = {b: exp for b, exp in _chat_failed_y_cooldown.items() if exp > now}
     bucket_px = max(20, int(gw_h * 0.04))
+    skip_interval = float(getattr(config, "RALLY_DUNE_SKIP_LOG_INTERVAL", 4.0))
 
     filtered: List[Tuple[int, int]] = []
     for bx, by in buttons:
         card_sig = _extract_chat_card_signature(screen_crop, by)
         if _is_card_signature_cooled_down(card_sig):
+            if log_cb and (now - _last_skip_log_time) >= skip_interval:
+                log_cb(f"Dune Chat: Bỏ qua thẻ ở Y={by} (đang khóa thẻ đầy 45s)")
+                _last_skip_log_time = now
             continue
         if (by // bucket_px) in _chat_failed_y_cooldown:
+            if log_cb and (now - _last_skip_log_time) >= skip_interval:
+                log_cb(f"Dune Chat: Bỏ qua nút ở Y={by} (đang khóa vị trí Y 8s)")
+                _last_skip_log_time = now
             continue
         filtered.append((bx, by))
     return filtered
@@ -1171,7 +1182,10 @@ def _tap_chat_join_and_handle_popup(
         if is_pop_late:
             return "JOINED" if is_join_late else "POPUP_HANDLED"
     else:
-        _chat_failed_y_cooldown[y_bucket] = time.time() + float(getattr(config, "RALLY_DUNE_TAP_COOLDOWN", 8.0))
+        tap_cd = float(getattr(config, "RALLY_DUNE_TAP_COOLDOWN", 8.0))
+        _chat_failed_y_cooldown[y_bucket] = time.time() + tap_cd
+        if log_cb:
+            log_cb(f"Dune Chat: Bấm Y={btn_y} nhưng không mở popup (hụt/hết hạn) -> Khóa Y {int(tap_cd)}s")
     return "NO_POPUP"
 
 
@@ -1212,7 +1226,7 @@ def scan_and_join_chat_rallies(
                 return "NONE"
 
     # Nhịp 1: Quét đáy Chat (tin nhắn mới nhất)
-    btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(frame), frame, gw_h)
+    btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(frame), frame, gw_h, log_cb)
     if btns:
         if log_cb:
             log_cb(f"Dune Chat: Phát hiện {len(btns)} nút Tham gia ở đáy -> Chọn Rally mới nhất")
@@ -1227,7 +1241,7 @@ def scan_and_join_chat_rallies(
             return "STOPPED"
         bot_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
         if bot_frame is not None and _is_chat_open(bot_frame):
-            bot_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(bot_frame), bot_frame, gw_h)
+            bot_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(bot_frame), bot_frame, gw_h, log_cb)
             if bot_btns:
                 if log_cb:
                     log_cb("Dune Chat: Thấy Rally ở đáy sau khi bấm mũi tên tím -> Bấm Tham gia")
@@ -1259,7 +1273,7 @@ def scan_and_join_chat_rallies(
         if up_frame is None or not _is_chat_open(up_frame):
             break
         last_up_frame = up_frame
-        up_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(up_frame), up_frame, gw_h)
+        up_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(up_frame), up_frame, gw_h, log_cb)
         if up_btns:
             if log_cb:
                 log_cb("Dune Chat: Tìm thấy Rally bị trôi -> Bấm Tham gia")
@@ -1295,7 +1309,7 @@ def scan_and_join_chat_rallies(
     # Kiểm tra nhanh đáy Chat một lần sau khi vừa về đáy (bắt kèo mới rơi vào đúng lúc cuộn)
     end_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
     if end_frame is not None and _is_chat_open(end_frame):
-        end_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(end_frame), end_frame, gw_h)
+        end_btns = _filter_chat_buttons_by_cooldown(_find_chat_join_buttons(end_frame), end_frame, gw_h, log_cb)
         if end_btns:
             if log_cb:
                 log_cb("Dune Chat: Phát hiện Rally mới ở đáy sau khi cuộn về -> Bấm Tham gia")

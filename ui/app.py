@@ -2,6 +2,7 @@
 Giao diện người dùng COC AutoMaster - Thiết kế tối giản, gọn nhẹ & dễ thao tác.
 """
 
+import os
 import time
 import threading
 from typing import Optional, Tuple
@@ -165,6 +166,8 @@ class AutoApp(ctk.CTk):
         self.rally_mode = "map"
         self.capture_mode = "mss"
         self.fishing_click_mode = "mouse"
+        self._log_lock = threading.Lock()
+        self._log_dir, self._log_file_path = self._init_log_file()
 
         self._build_header()
         self._build_device_card()
@@ -609,6 +612,21 @@ class AutoApp(ctk.CTk):
             command=self.clear_log,
         ).pack(side="right")
 
+        ctk.CTkButton(
+            log_top,
+            text="File log",
+            width=54,
+            height=20,
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            fg_color=BTN_GHOST_BG,
+            hover_color=BTN_GHOST_HOVER,
+            border_width=1,
+            border_color=BTN_GHOST_BORDER,
+            corner_radius=5,
+            text_color=TEXT_MUTED,
+            command=self.open_log_folder,
+        ).pack(side="right", padx=(0, 5))
+
         self.txt_log = ctk.CTkTextbox(
             log_box,
             font=ctk.CTkFont(family="Consolas", size=11),
@@ -619,6 +637,26 @@ class AutoApp(ctk.CTk):
         )
         self.txt_log.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
+    def _init_log_file(self) -> Tuple[str, str]:
+        """Tạo thư mục lưu nhật ký theo ngày trong %LOCALAPPDATA%/COC_AutoMaster/logs."""
+        base_dir = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+        log_dir = os.path.join(base_dir, "COC_AutoMaster", "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+        except Exception:
+            return "", ""
+        log_path = os.path.join(log_dir, f"auto_{time.strftime('%Y-%m-%d')}.log")
+        return log_dir, log_path
+
+    def open_log_folder(self) -> None:
+        if not self._log_dir or not os.path.isdir(self._log_dir):
+            self.log("[Cảnh báo] Chưa tạo được thư mục file log.")
+            return
+        try:
+            os.startfile(self._log_dir)  # type: ignore[attr-defined]
+        except Exception as e:
+            self.log(f"[Lỗi] Không mở được thư mục log: {e}")
+
     def _append_log(self, line: str) -> None:
         try:
             self.txt_log.insert("end", line)
@@ -627,8 +665,15 @@ class AutoApp(ctk.CTk):
             pass
 
     def log(self, msg: str) -> None:
-        """Ghi log an toàn từ cả main thread lẫn background worker thread."""
+        """Ghi log an toàn ra UI và file nhật ký theo ngày."""
         line = f"[{time.strftime('%H:%M:%S')}] {msg}\n"
+        if self._log_file_path:
+            try:
+                with self._log_lock:
+                    with open(self._log_file_path, "a", encoding="utf-8") as f:
+                        f.write(line)
+            except Exception:
+                pass
         if threading.current_thread() is threading.main_thread():
             self._append_log(line)
         else:

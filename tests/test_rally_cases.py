@@ -686,19 +686,27 @@ class TestRallyCases(unittest.TestCase):
             f"Phải vuốt lên {expected_steps} nhịp rồi vuốt xuống lại đáy {expected_steps} nhịp",
         )
 
-        # Cooldown chống bấm lặp khi nút xanh bấm vào không mở popup
+        # Cooldown chống bấm lặp khi nút xanh bấm vào không mở popup (có ghi log chẩn đoán)
         self.mock_adb.clear()
         chat_stale = self._create_chat_frame(include_green_btn=True, lien_minh_active=True)
+        nopop_logs = []
         with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_stale)):
-            res_nopop = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+            res_nopop = rally.scan_and_join_chat_rallies(
+                None, self.vp, self.mock_adb, self.stop_event, log_cb=nopop_logs.append, allow_scroll=False
+            )
         self.assertEqual(res_nopop, "NO_POPUP")
         self.assertEqual(len(self.mock_adb.taps), 1)
+        self.assertTrue(any("NO_POPUP" in m or "không mở popup" in m for m in nopop_logs))
 
         self.mock_adb.clear()
+        skip_logs = []
         with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_stale)):
-            res_cooldown = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=False)
+            res_cooldown = rally.scan_and_join_chat_rallies(
+                None, self.vp, self.mock_adb, self.stop_event, log_cb=skip_logs.append, allow_scroll=False
+            )
         self.assertEqual(res_cooldown, "NONE")
         self.assertEqual(len(self.mock_adb.taps), 0, "Vị trí Y vừa lỗi phải bị khóa cooldown 8s")
+        self.assertTrue(any("Bỏ qua" in m for m in skip_logs))
 
         # Đóng Chat an toàn bằng khoảng trống phía trên đỉnh (Y ~ 0.030, tránh xa nút X đáy 0.955)
         self.mock_adb.clear()
