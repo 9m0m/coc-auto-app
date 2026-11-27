@@ -1238,11 +1238,11 @@ def scan_and_join_chat_rallies(
         return "NONE"
 
     # Nhịp 2: Vuốt lên êm (kéo ngón tay từ trên xuống) để soi các Rally vừa bị trôi lên trên
-    scroll_steps = int(getattr(config, "RALLY_CHAT_SCROLL_UP_STEPS", 2))
+    scroll_steps = int(getattr(config, "RALLY_CHAT_SCROLL_UP_STEPS", 3))
     swipe_x = int(gw_l + gw_w * getattr(config, "RALLY_CHAT_SWIPE_X", 0.560))
     top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_TOP_Y", 0.300))
     bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_BOTTOM_Y", 0.660))
-    swipe_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DURATION_MS", 480))
+    swipe_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DURATION_MS", 600))
     scroll_delay = float(getattr(config, "RALLY_DELAY_AFTER_CHAT_SCROLL", 0.45))
 
     swiped_up = 0

@@ -679,7 +679,12 @@ class TestRallyCases(unittest.TestCase):
             res = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=True)
 
         self.assertEqual(res, "NONE")
-        self.assertEqual(len(self.mock_adb.swipes), 4, "Phải vuốt lên 2 nhịp rồi vuốt xuống lại đáy 2 nhịp")
+        expected_steps = int(getattr(config, "RALLY_CHAT_SCROLL_UP_STEPS", 3))
+        self.assertEqual(
+            len(self.mock_adb.swipes),
+            expected_steps * 2,
+            f"Phải vuốt lên {expected_steps} nhịp rồi vuốt xuống lại đáy {expected_steps} nhịp",
+        )
 
         # Cooldown chống bấm lặp khi nút xanh bấm vào không mở popup
         self.mock_adb.clear()
@@ -1192,18 +1197,19 @@ class TestRallyCases(unittest.TestCase):
         with patch("modules.rally.safe_grab", side_effect=mock_grab_jump):
             res_jump = rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=True)
         self.assertEqual(res_jump, "NONE")
-        self.assertEqual(len(self.mock_adb.swipes), 2, "Chỉ vuốt lên 2 nhịp, không vuốt xuống vì đã có nút '>>'")
+        expected_steps = int(getattr(config, "RALLY_CHAT_SCROLL_UP_STEPS", 3))
+        self.assertEqual(len(self.mock_adb.swipes), expected_steps, f"Chỉ vuốt lên {expected_steps} nhịp, không vuốt xuống vì đã có nút '>>'")
         self.assertEqual(len(self.mock_adb.taps), 1, "Phải bấm 1 phát vào nút mũi tên tím '>>' để về đáy")
 
         # 3b. Khi không có nút '>>', vuốt xuống đáy phải có biên độ dài hơn và nhanh hơn vuốt lên để không bị lửng
         self.mock_adb.clear()
         with patch("modules.rally.safe_grab", side_effect=make_mock_grab(chat_clean_bottom)):
             rally.scan_and_join_chat_rallies(None, self.vp, self.mock_adb, self.stop_event, allow_scroll=True)
-        self.assertEqual(len(self.mock_adb.swipes), 4)
+        self.assertEqual(len(self.mock_adb.swipes), expected_steps * 2)
         up_span = abs(self.mock_adb.swipes[0][3] - self.mock_adb.swipes[0][1])
-        down_span = abs(self.mock_adb.swipes[2][3] - self.mock_adb.swipes[2][1])
+        down_span = abs(self.mock_adb.swipes[expected_steps][3] - self.mock_adb.swipes[expected_steps][1])
         self.assertGreater(down_span, up_span, "Vuốt xuống đáy phải dài hơn vuốt lên")
-        self.assertLess(self.mock_adb.swipes[2][4], self.mock_adb.swipes[0][4], "Vuốt xuống đáy phải dứt khoát hơn vuốt lên")
+        self.assertLess(self.mock_adb.swipes[expected_steps][4], self.mock_adb.swipes[0][4], "Vuốt xuống đáy phải dứt khoát hơn vuốt lên")
 
         # 4. Kiểm tra trực tiếp trên 2 ảnh thật của người dùng (526f091b có '>>', eebec9e2 ở đáy sạch)
         p_has = r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795752756716_526f091b.jpg"
