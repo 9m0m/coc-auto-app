@@ -1026,6 +1026,29 @@ class TestRallyCases(unittest.TestCase):
             self.assertEqual(len(self.mock_adb.taps), 1)
             self.assertAlmostEqual(self.mock_adb.taps[0][1] / h_c, 0.950, delta=0.04)
 
+    def test_case_26_dune_chat_gold_tile_rally_and_purple_shield_tab(self):
+        """Thẻ Rally ô đất màu vàng (Cồn Cát / Đồng Bằng) + tab Liên Minh khiên viền vàng nền tím vẫn phải bắt chuẩn."""
+        chat_gold_card = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        # Ô biểu tượng Cồn Cát màu vàng/cam đất (BGR: ~50, 190, 235) phía trên nút Tham gia
+        chat_gold_card[int(self.gw_h * 0.61):int(self.gw_h * 0.68), int(self.gw_w * 0.30):int(self.gw_w * 0.48)] = (50, 190, 235)
+        chat_gold_card[int(self.gw_h * 0.69):int(self.gw_h * 0.735), int(self.gw_w * 0.34):int(self.gw_w * 0.84)] = (35, 200, 50)
+        btns_gold = rally._find_chat_join_buttons(chat_gold_card)
+        self.assertEqual(len(btns_gold), 1, "Thẻ Rally màu vàng (Cồn Cát) phải bắt được nút Tham gia")
+        self.assertAlmostEqual(btns_gold[0][1] / self.gw_h, 0.712, delta=0.04)
+
+        # Kiểm tra trực tiếp trên ảnh thật ee51bb08 (Cồn Cát(28, 14) 1/8 + tab Liên Minh Zaplet)
+        local_ee = r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795745417461_ee51bb08.jpg"
+        if os.path.exists(local_ee):
+            raw_ee = cv2.imread(local_ee)
+            h_e, w_e = raw_ee.shape[:2]
+            scale_e = max(w_e / 443.0, h_e / 761.0)
+            img_ee = raw_ee[int(32 * scale_e):h_e, 0:w_e - int(50 * scale_e)]
+            self.assertTrue(rally._is_chat_open(img_ee))
+            self.assertTrue(rally._is_lien_minh_tab_active(img_ee), "Tab Liên Minh Zaplet phải được nhận diện đúng")
+            btns_ee = rally._find_chat_join_buttons(img_ee)
+            self.assertEqual(len(btns_ee), 1, "Ảnh thật Cồn Cát(28, 14) phải bắt được đúng 1 nút Tham gia")
+            self.assertAlmostEqual(btns_ee[0][1] / img_ee.shape[0], 0.731, delta=0.04)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

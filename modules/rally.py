@@ -855,8 +855,18 @@ def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Optional[Tuple[fl
     ref_h = float(getattr(config, "RALLY_CHAT_TAB_REF_HEIGHT", 715.0))
     base_sc = float(gh) / ref_h if ref_h > 0 else 1.0
     match_thresh = float(getattr(config, "RALLY_CHAT_TAB_MATCH_THRESHOLD", 0.68))
+    gray_thresh = float(getattr(config, "RALLY_CHAT_TAB_GRAY_MATCH_THRESHOLD", 0.78))
+    gold_min_ratio = float(getattr(config, "RALLY_CHAT_TAB_GOLD_MIN_RATIO", 0.15))
+    lower_gold = np.array(getattr(config, "HSV_CHAT_CARD_GOLD_LOWER", [12, 80, 100]), dtype=np.uint8)
+    upper_gold = np.array(getattr(config, "HSV_CHAT_CARD_GOLD_UPPER", [34, 255, 255]), dtype=np.uint8)
+
+    sidebar_gray = cv2.cvtColor(sidebar, cv2.COLOR_BGR2GRAY)
+    tpl_gray = cv2.cvtColor(shield_tpl, cv2.COLOR_BGR2GRAY) if len(shield_tpl.shape) == 3 else shield_tpl
+
     best_score = 0.0
     best_cy_px = 0
+    best_gray_score = 0.0
+    best_gray_cy_px = 0
     tpl_h, tpl_w = shield_tpl.shape[:2]
     for mult in (0.85, 0.95, 1.00, 1.05, 1.15, 1.30):
         cur_sc = base_sc * mult
@@ -864,19 +874,34 @@ def _detect_lien_minh_tab_target_y(screen_crop: np.ndarray) -> Optional[Tuple[fl
         cur_th = max(8, int(tpl_h * cur_sc))
         if cur_tw >= sidebar.shape[1] or cur_th >= sidebar.shape[0]:
             continue
-        scaled = cv2.resize(
-            shield_tpl,
-            (cur_tw, cur_th),
-            interpolation=cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR,
-        )
+        interp = cv2.INTER_AREA if cur_sc < 1.0 else cv2.INTER_LINEAR
+        scaled = cv2.resize(shield_tpl, (cur_tw, cur_th), interpolation=interp)
         res = cv2.matchTemplate(sidebar, scaled, cv2.TM_CCOEFF_NORMED)
         _, max_v, _, max_l = cv2.minMaxLoc(res)
         if max_v > best_score:
             best_score = float(max_v)
             best_cy_px = int(sb_y1 + max_l[1] + cur_th // 2)
 
+        scaled_gray = cv2.resize(tpl_gray, (cur_tw, cur_th), interpolation=interp)
+        res_gray = cv2.matchTemplate(sidebar_gray, scaled_gray, cv2.TM_CCOEFF_NORMED)
+        _, max_gv, _, max_gl = cv2.minMaxLoc(res_gray)
+        if max_gv >= gray_thresh and float(max_gv) > best_gray_score:
+            gx, gy = int(max_gl[0]), int(max_gl[1])
+            patch = sidebar[gy:gy + cur_th, gx:gx + cur_tw]
+            if patch.size > 0:
+                hsv_p = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+                gold_ratio = float(np.count_nonzero(cv2.inRange(hsv_p, lower_gold, upper_gold))) / float(
+                    max(1, patch.shape[0] * patch.shape[1])
+                )
+                if gold_ratio >= gold_min_ratio:
+                    best_gray_score = float(max_gv)
+                    best_gray_cy_px = int(sb_y1 + gy + cur_th // 2)
+
     if best_score >= match_thresh and best_cy_px > 0:
         cy_rel = float(best_cy_px) / float(max(1, gh))
+        return max(0.05, cy_rel - 0.055), min(0.86, cy_rel + 0.055), cy_rel
+    if best_gray_score >= gray_thresh and best_gray_cy_px > 0:
+        cy_rel = float(best_gray_cy_px) / float(max(1, gh))
         return max(0.05, cy_rel - 0.055), min(0.86, cy_rel + 0.055), cy_rel
     return None
 
@@ -909,7 +934,10 @@ def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
 
 def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
     """
-    Xác nhận phía trên nút xanh có phần thẻ Rally (màu tím 'Đơn Vị Tiêu Chuẩn' hoặc hồng/đỏ san hô 'Tù Và Sa Mạc').
+    Xác nhận phía trên nút xanh có phần thẻ Rally:
+    - Tím ('Đơn Vị Tiêu Chuẩn'),
+    - Hồng/đỏ san hô ('Tù Và Sa Mạc'),
+    - Hoặc vàng/cam đất ('Cồn Cát' / 'Đồng Bằng' / 'Mỏ Vàng').
     Loại bỏ 100% bong bóng tin nhắn màu xanh lá do người dùng/đồng đội tự chat.
     """
     if screen_crop is None or screen_crop.size == 0:
@@ -926,7 +954,10 @@ def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
     purple_mask = cv2.inRange(hsv_roi, np.array([120, 60, 80], dtype=np.uint8), np.array([155, 255, 255], dtype=np.uint8))
     pink_red_high = cv2.inRange(hsv_roi, np.array([162, 70, 80], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8))
     pink_red_low = cv2.inRange(hsv_roi, np.array([0, 70, 80], dtype=np.uint8), np.array([10, 255, 255], dtype=np.uint8))
-    card_mask = purple_mask | pink_red_high | pink_red_low
+    lower_gold = np.array(getattr(config, "HSV_CHAT_CARD_GOLD_LOWER", [12, 80, 100]), dtype=np.uint8)
+    upper_gold = np.array(getattr(config, "HSV_CHAT_CARD_GOLD_UPPER", [34, 255, 255]), dtype=np.uint8)
+    gold_mask = cv2.inRange(hsv_roi, lower_gold, upper_gold)
+    card_mask = purple_mask | pink_red_high | pink_red_low | gold_mask
     card_ratio = float(np.count_nonzero(card_mask)) / float(max(1, roi.shape[0] * roi.shape[1]))
     return card_ratio >= float(getattr(config, "RALLY_CHAT_CARD_PURPLE_MIN_RATIO", 0.12))
 
