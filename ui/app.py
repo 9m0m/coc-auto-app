@@ -96,9 +96,8 @@ class HelpDialog(ctk.CTkToplevel):
         ).pack(anchor="w", padx=14, pady=(8, 3))
         txt1 = (
             "• BlueStacks 5: Cài đặt -> Nâng cao -> Bật Cầu gỡ lỗi Android (ADB)\n"
-            "• LDPlayer / MuMu / Nox: Bật kết nối ADB (nếu đã bật sẵn thì giữ nguyên)\n"
-            "• Game màn hình dọc: Khuyến nghị 900x1600 hoặc 720x1280 (Phone mode)\n"
-            "  (Hỗ trợ tự động đồng bộ kể cả khi giả lập đang để chế độ Tablet ngang)"
+            "• LDPlayer: Chọn 'Mở kết nối từ xa' + Bật Root rồi khởi động lại\n"
+            "• Khổ dọc khuyến nghị: 900x1600 hoặc 720x1280 (Phone mode)"
         )
         ctk.CTkLabel(
             f1, text=txt1, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
@@ -109,15 +108,15 @@ class HelpDialog(ctk.CTkToplevel):
         f2.pack(fill="x", padx=18, pady=4)
         ctk.CTkLabel(
             f2,
-            text="Lưu Ý Quan Trọng (Tránh Lỗi Nhận Diện)",
+            text="Hiển Thị (MSS) vs Chạy Ngầm (ADB)",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color="#38bdf8",
         ).pack(anchor="w", padx=14, pady=(8, 3))
         txt2 = (
-            "• Chế độ Hiển thị (MSS) & Auto Câu Cá: KHÔNG thu nhỏ (minimize) và\n"
-            "  không để cửa sổ khác che mất vùng game vì tool đọc trực tiếp từ màn hình.\n"
-            "• Rally / Phiêu Lưu: Có thể bật 'Chạy ngầm (ADB)' để che hoặc thu nhỏ\n"
-            "  (nhớ tắt Eco Mode của BlueStacks để game không bị đóng băng khung hình)."
+            "• Hiển thị (MSS) & Câu Cá: KHÔNG minimize và KHÔNG để cửa sổ khác\n"
+            "  (kể cả app Auto) che mất vùng game của giả lập.\n"
+            "• Rally / Phiêu Lưu: Bật 'Chạy ngầm (ADB)' để che hoặc minimize\n"
+            "  (nhớ tắt Eco Mode của BlueStacks để game không bị đứng hình)."
         )
         ctk.CTkLabel(
             f2, text=txt2, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
@@ -133,10 +132,9 @@ class HelpDialog(ctk.CTkToplevel):
             text_color="#38bdf8",
         ).pack(anchor="w", padx=14, pady=(8, 3))
         txt3 = (
-            "• Auto Rally: Mở sẵn Sa Hải Mê Thành. Tự động thu phóng (🔍-)\n"
-            "  và canh 5 phút tổng tấn công đánh boss liên tục.\n"
-            "• Auto Câu Cá: Mở sẵn hồ câu cá. Tự quăng cần và kéo cá rãnh vàng.\n"
-            "• Auto Phiêu Lưu: Mở sẵn Mê Cung. Tự vượt ải và chống kẹt đuốc."
+            "• Auto Rally: Chọn Map Thường (zoom toàn cảnh) hoặc Sa Hải Dune (Chat).\n"
+            "• Auto Câu Cá: Mở sẵn hồ câu. Hỗ trợ Chiếm chuột (0.02s) / Click ảo.\n"
+            "• Auto Phiêu Lưu: Mở sẵn Mê Cung. Tự vượt ải, đánh quái & chống kẹt."
         )
         ctk.CTkLabel(
             f3, text=txt3, font=ctk.CTkFont(family="Segoe UI", size=11), text_color="#94a3b8", justify="left"
