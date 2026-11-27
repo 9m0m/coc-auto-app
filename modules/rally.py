@@ -909,7 +909,7 @@ def _is_lien_minh_tab_active(screen_crop: np.ndarray) -> bool:
 
 def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
     """
-    Xác nhận phía trên nút xanh có phần thẻ Rally màu tím ('Tôi đã bắt đầu Tổng Tấn Công!').
+    Xác nhận phía trên nút xanh có phần thẻ Rally (màu tím 'Đơn Vị Tiêu Chuẩn' hoặc hồng/đỏ san hô 'Tù Và Sa Mạc').
     Loại bỏ 100% bong bóng tin nhắn màu xanh lá do người dùng/đồng đội tự chat.
     """
     if screen_crop is None or screen_crop.size == 0:
@@ -924,8 +924,11 @@ def _has_purple_rally_card_above(screen_crop: np.ndarray, btn_y: int) -> bool:
         return False
     hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     purple_mask = cv2.inRange(hsv_roi, np.array([120, 60, 80], dtype=np.uint8), np.array([155, 255, 255], dtype=np.uint8))
-    purple_ratio = float(np.count_nonzero(purple_mask)) / float(max(1, roi.shape[0] * roi.shape[1]))
-    return purple_ratio >= float(getattr(config, "RALLY_CHAT_CARD_PURPLE_MIN_RATIO", 0.12))
+    pink_red_high = cv2.inRange(hsv_roi, np.array([162, 70, 80], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8))
+    pink_red_low = cv2.inRange(hsv_roi, np.array([0, 70, 80], dtype=np.uint8), np.array([10, 255, 255], dtype=np.uint8))
+    card_mask = purple_mask | pink_red_high | pink_red_low
+    card_ratio = float(np.count_nonzero(card_mask)) / float(max(1, roi.shape[0] * roi.shape[1]))
+    return card_ratio >= float(getattr(config, "RALLY_CHAT_CARD_PURPLE_MIN_RATIO", 0.12))
 
 
 def _find_chat_join_buttons(screen_crop: np.ndarray) -> List[Tuple[int, int]]:

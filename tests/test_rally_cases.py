@@ -868,6 +868,22 @@ class TestRallyCases(unittest.TestCase):
         self.assertEqual(len(btns), 1)
         self.assertAlmostEqual(btns[0][1] / self.gw_h, 0.782, delta=0.03)
 
+        # 4. Thẻ Rally màu hồng/đỏ san hô (Tù Và Sa Mạc 1/12, 1/30) -> PHẢI bắt được nút Tham gia!
+        chat_pink_card = self._create_chat_frame(include_green_btn=False, lien_minh_active=True)
+        chat_pink_card[int(self.gw_h * 0.61):int(self.gw_h * 0.68), int(self.gw_w * 0.30):int(self.gw_w * 0.52)] = (105, 80, 235)
+        chat_pink_card[int(self.gw_h * 0.69):int(self.gw_h * 0.735), int(self.gw_w * 0.34):int(self.gw_w * 0.84)] = (35, 200, 50)
+        btns_pink = rally._find_chat_join_buttons(chat_pink_card)
+        self.assertEqual(len(btns_pink), 1)
+        self.assertAlmostEqual(btns_pink[0][1] / self.gw_h, 0.712, delta=0.04)
+
+        local_97 = r"C:\Users\ADMIN\.gemini\antigravity\brain\e2ec6a35-0667-4364-bb2e-744655c2954d\.user_uploaded\media_1795738781489_97674e2b.jpg"
+        if os.path.exists(local_97):
+            raw_97 = cv2.imread(local_97)
+            img_97 = raw_97[31:, 15:raw_97.shape[1] - 36]
+            btns_97 = rally._find_chat_join_buttons(img_97)
+            self.assertEqual(len(btns_97), 1)
+            self.assertAlmostEqual(btns_97[0][1] / img_97.shape[0], 0.708, delta=0.03)
+
     def test_case_22_lien_minh_tab_below_tradecard_stranger_dm(self):
         """Khi tradecard / tin nhắn người lạ nhảy lên slot 1-2 đẩy Liên Minh xuống slot 3 -> KHÔNG bấm nhầm tradecard!"""
         shield_tpl = assets.get_lien_minh_tab_template()
