@@ -1267,17 +1267,20 @@ def scan_and_join_chat_rallies(
             return _tap_chat_join_and_handle_popup(sct, vp, adb, up_btns[0], stop_event, log_cb, card_sig=up_sig)
 
     # Nhịp 3: Ưu tiên bấm nút mũi tên tím '>>' nhảy thẳng xuống tận đáy nếu có (tránh bị lửng khi có tin mới);
-    # nếu không thấy nút '>>' mới fallback vuốt xuống lại.
+    # nếu không thấy nút '>>' mới fallback vuốt xuống với quãng dài & dứt khoát hơn để luôn chạm tận đáy.
     jump_btn = _find_chat_scroll_bottom_button(last_up_frame) if last_up_frame is not None else None
     if jump_btn is not None:
         _adb_tap(adb, vp, gw_l + jump_btn[0], gw_t + jump_btn[1], "Bấm mũi tên tím nhảy thẳng xuống đáy Chat", log_cb)
         if _sleep(float(getattr(config, "RALLY_DELAY_AFTER_SCROLL_CLICK", 0.45)), stop_event):
             return "STOPPED"
     else:
+        down_top_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_TOP_Y", 0.180))
+        down_bot_y = int(gw_t + gw_h * getattr(config, "RALLY_CHAT_SWIPE_DOWN_BOTTOM_Y", 0.780))
+        down_ms = int(getattr(config, "RALLY_CHAT_SWIPE_DOWN_DURATION_MS", 220))
         for step in range(swiped_up):
             if stop_event.is_set():
                 return "STOPPED"
-            _adb_swipe(adb, vp, swipe_x, bot_y, swipe_x, top_y, swipe_ms, f"Vuốt xuống lại đáy Chat ({step + 1}/{swiped_up})", log_cb)
+            _adb_swipe(adb, vp, swipe_x, down_bot_y, swipe_x, down_top_y, down_ms, f"Vuốt mạnh xuống đáy Chat ({step + 1}/{swiped_up})", log_cb)
             if _sleep(scroll_delay, stop_event):
                 return "STOPPED"
         # Chốt kiểm tra lần cuối sau vuốt xuống: nếu vẫn còn nút '>>' (do tin mới trôi vào) thì bấm luôn

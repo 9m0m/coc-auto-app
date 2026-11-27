@@ -197,11 +197,16 @@ RALLY_CHAT_CARD_PURPLE_MIN_RATIO: float = 0.12
 HSV_CHAT_CARD_GOLD_LOWER = [12, 80, 100]
 HSV_CHAT_CARD_GOLD_UPPER = [34, 255, 255]
 
-# Thông số vuốt chống trôi tin nhắn trong Chat (Vuốt êm vừa phải tránh fling nhảy cóc thẻ Rally)
+# Thông số vuốt chống trôi tin nhắn trong Chat:
+# - Vuốt lên: êm và vừa phải (tránh fling nhảy cóc thẻ Rally)
+# - Vuốt xuống đáy: quãng dài & dứt khoát hơn để luôn chạm tận đáy kể cả khi có tin mới hoặc chưa hiện nút '>>'
 RALLY_CHAT_SWIPE_X: float = 0.560
 RALLY_CHAT_SWIPE_TOP_Y: float = 0.300
 RALLY_CHAT_SWIPE_BOTTOM_Y: float = 0.660
 RALLY_CHAT_SWIPE_DURATION_MS: int = 480
+RALLY_CHAT_SWIPE_DOWN_TOP_Y: float = 0.180
+RALLY_CHAT_SWIPE_DOWN_BOTTOM_Y: float = 0.780
+RALLY_CHAT_SWIPE_DOWN_DURATION_MS: int = 220
 RALLY_CHAT_SCROLL_UP_STEPS: int = 2
 
 # Nút mũi tên tím cuộn xuống tin nhắn mới nhất trong Chat (góc dưới phải)
