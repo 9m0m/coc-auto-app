@@ -241,9 +241,26 @@ def _handle_rally_detail_popup(
             return True, False
 
     # 1. Type A: Popup danh sách Rally (hỗ trợ cả bản thấp Y=0.15..0.22 và bản cao Dune Y=0.02..0.08)
+    # Lưu ý badge '18+ Chơi quá 180 phút' có thể đè chữ trắng lên phần trái header thấp -> kiểm tra thêm phần phải X=0.25..0.42 + viền tím thân bảng.
     tab_low = screen_crop[int(gw_h * 0.15):int(gw_h * 0.22), int(gw_w * 0.03):int(gw_w * 0.40)]
+    tab_low_right = screen_crop[int(gw_h * 0.15):int(gw_h * 0.22), int(gw_w * 0.25):int(gw_w * 0.42)]
     top_dim_low = screen_crop[int(gw_h * 0.09):int(gw_h * 0.14), int(gw_w * 0.20):int(gw_w * 0.80)]
-    is_low_sheet = (tab_low.size > 0 and top_dim_low.size > 0 and np.mean(tab_low) < 75.0 and np.mean(top_dim_low) < 70.0)
+    left_margin_low = screen_crop[int(gw_h * 0.25):int(gw_h * 0.85), int(gw_w * 0.005):int(gw_w * 0.035)]
+    left_margin_purple_ratio = 0.0
+    if left_margin_low.size > 0:
+        hsv_lm = cv2.cvtColor(left_margin_low, cv2.COLOR_BGR2HSV)
+        lm_mask = cv2.inRange(hsv_lm, np.array([115, 35, 60], dtype=np.uint8), np.array([160, 220, 255], dtype=np.uint8))
+        left_margin_purple_ratio = float(np.count_nonzero(lm_mask)) / float(max(1, left_margin_low.shape[0] * left_margin_low.shape[1]))
+
+    is_low_sheet = (
+        tab_low.size > 0
+        and top_dim_low.size > 0
+        and float(np.mean(top_dim_low)) < 70.0
+        and (
+            float(np.mean(tab_low)) < 75.0
+            or (tab_low_right.size > 0 and float(np.mean(tab_low_right)) < 70.0 and left_margin_purple_ratio >= 0.55)
+        )
+    )
 
     tab_high = screen_crop[int(gw_h * 0.02):int(gw_h * 0.08), int(gw_w * 0.03):int(gw_w * 0.38)]
     top_dim_high = screen_crop[int(gw_h * 0.01):int(gw_h * 0.07), int(gw_w * 0.45):int(gw_w * 0.90)]

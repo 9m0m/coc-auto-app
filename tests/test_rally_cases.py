@@ -961,6 +961,55 @@ class TestRallyCases(unittest.TestCase):
             self.assertEqual(len(self.mock_adb.taps), 1)
             self.assertAlmostEqual(self.mock_adb.taps[0][1] / h6, 0.955, delta=0.03)
 
+    def test_case_25_low_multi_rally_sheet_with_18_plus_badge(self):
+        """Bảng 2+ Rally bản thấp (Y=0.15..0.22) bị nhãn '18+' chữ trắng đè phần trái header -> Vẫn phải nhận diện Type A, bấm nút xanh & đóng [X]."""
+        frame = self._create_blank_frame(bg_bgr=(140, 75, 95))
+        # Vùng mờ phía trên Y: 0.00..0.14 và header tối Y: 0.14..0.22
+        frame[0:int(self.gw_h * 0.145), :] = (38, 30, 35)
+        frame[int(self.gw_h * 0.145):int(self.gw_h * 0.215), :] = (48, 38, 44)
+        # Dán nhãn trắng giả lập '18+ Chơi quá 180 phút' đè góc trái tab_low (X: 0.04..0.24) làm np.mean(tab_low) > 75
+        frame[int(self.gw_h * 0.155):int(self.gw_h * 0.205), int(self.gw_w * 0.04):int(self.gw_w * 0.24)] = (240, 240, 240)
+        # Thẻ 1 xám, Thẻ 2 xanh lá 'Tham gia'
+        frame[int(self.gw_h * 0.30):int(self.gw_h * 0.35), int(self.gw_w * 0.60):int(self.gw_w * 0.88)] = (150, 150, 150)
+        frame[int(self.gw_h * 0.50):int(self.gw_h * 0.55), int(self.gw_w * 0.60):int(self.gw_w * 0.88)] = (35, 200, 50)
+        # Nút [X] trắng ở đáy
+        frame[int(self.gw_h * 0.91):self.gw_h, :] = (30, 22, 26)
+        frame[int(self.gw_h * 0.935):int(self.gw_h * 0.97), int(self.gw_w * 0.47):int(self.gw_w * 0.53)] = (250, 250, 250)
+
+        frame_after = frame.copy()
+        frame_after[int(self.gw_h * 0.50):int(self.gw_h * 0.55), int(self.gw_w * 0.60):int(self.gw_w * 0.88)] = (150, 150, 150)
+
+        def mock_grab(sct, mon):
+            cur = frame if len(self.mock_adb.swipes) == 0 else frame_after
+            return make_mock_grab(cur)(sct, mon)
+
+        with patch("modules.rally.safe_grab", side_effect=mock_grab):
+            is_pop, is_join = rally._handle_rally_detail_popup(
+                None, self.vp, self.mock_adb, self.stop_event, allow_type_d_close_x=False
+            )
+        self.assertTrue(is_pop)
+        self.assertTrue(is_join)
+        self.assertGreaterEqual(len(self.mock_adb.taps), 2)
+        self.assertAlmostEqual(self.mock_adb.taps[0][1] / self.gw_h, 0.525, delta=0.04)
+        self.assertAlmostEqual(self.mock_adb.taps[-1][1] / self.gw_h, 0.952, delta=0.03)
+
+        # Kiểm tra trực tiếp trên ảnh thật cb273570 (4 thẻ + nhãn 18+ + nút X đáy)
+        local_cb = r"C:\Users\ADMIN\.gemini\antigravity\brain\e2ec6a35-0667-4364-bb2e-744655c2954d\.user_uploaded\media_1795738195039_cb273570.jpg"
+        if os.path.exists(local_cb):
+            raw_cb = cv2.imread(local_cb)
+            img_cb = raw_cb[31:, 15:raw_cb.shape[1] - 36]
+            h_c, w_c = img_cb.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (w_c, h_c)
+            with patch("modules.rally.safe_grab", side_effect=make_mock_grab(img_cb)):
+                is_pc, is_jc = rally._handle_rally_detail_popup(
+                    None, (0, 0, w_c, h_c), self.mock_adb, self.stop_event, allow_type_d_close_x=False
+                )
+            self.assertTrue(is_pc)
+            self.assertFalse(is_jc)
+            self.assertEqual(len(self.mock_adb.taps), 1)
+            self.assertAlmostEqual(self.mock_adb.taps[0][1] / h_c, 0.950, delta=0.04)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)
