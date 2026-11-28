@@ -246,6 +246,7 @@ def _handle_rally_detail_popup(
     # Lưu ý badge '18+ Chơi quá 180 phút' có thể đè chữ trắng lên phần trái header thấp -> kiểm tra thêm phần phải X=0.25..0.42 + viền tím thân bảng.
     tab_low = screen_crop[int(gw_h * 0.15):int(gw_h * 0.22), int(gw_w * 0.03):int(gw_w * 0.40)]
     tab_low_right = screen_crop[int(gw_h * 0.15):int(gw_h * 0.22), int(gw_w * 0.25):int(gw_w * 0.42)]
+    hdr_band_low = screen_crop[int(gw_h * 0.15):int(gw_h * 0.195), int(gw_w * 0.22):int(gw_w * 0.48)]
     top_dim_low = screen_crop[int(gw_h * 0.09):int(gw_h * 0.14), int(gw_w * 0.20):int(gw_w * 0.80)]
     left_margin_low = screen_crop[int(gw_h * 0.25):int(gw_h * 0.85), int(gw_w * 0.005):int(gw_w * 0.035)]
     left_margin_purple_ratio = 0.0
@@ -260,7 +261,13 @@ def _handle_rally_detail_popup(
         and float(np.mean(top_dim_low)) < 70.0
         and (
             float(np.mean(tab_low)) < 75.0
-            or (tab_low_right.size > 0 and float(np.mean(tab_low_right)) < 70.0 and left_margin_purple_ratio >= 0.55)
+            or (
+                left_margin_purple_ratio >= 0.55
+                and (
+                    (tab_low_right.size > 0 and float(np.mean(tab_low_right)) < 70.0)
+                    or (hdr_band_low.size > 0 and float(np.mean(hdr_band_low)) < 75.0)
+                )
+            )
         )
     )
 
@@ -343,7 +350,13 @@ def _handle_rally_detail_popup(
             joined_any = False
             cooldown_time = getattr(config, "RALLY_JOINED_COOLDOWN", 30.0)
 
-            # Nhịp 1: Quét và tham gia các Rally ở trang đầu (Rally 1 -> 4)
+            def _extract_sheet_body_sig(img_crop: np.ndarray) -> Optional[np.ndarray]:
+                body = img_crop[int(gw_h * 0.22):int(gw_h * 0.88), int(gw_w * 0.08):int(gw_w * 0.85)]
+                if body.size == 0:
+                    return None
+                return cv2.resize(cv2.cvtColor(body, cv2.COLOR_BGR2GRAY), (64, 64), interpolation=cv2.INTER_AREA).astype(np.int16)
+
+            # Nhịp 1: Quét và tham gia các Rally ở trang đầu
             if green_btns:
                 for idx, (btn_x, btn_y) in enumerate(green_btns):
                     if stop_event.is_set():
@@ -352,24 +365,53 @@ def _handle_rally_detail_popup(
                     joined_any = True
                     _sleep(0.35, stop_event)
 
-            # Vuốt cuộn trang lên để hiển thị các Rally thứ 5, 6... bị tràn bên dưới
+            # Cuộn qua nhiều trang (hỗ trợ ô có 16+ Rally tại Dune) và tự dừng sớm khi chạm đáy danh sách
+            max_scrolls = int(getattr(config, "RALLY_TYPE_A_MAX_SCROLLS", 7))
+            end_diff_thresh = float(getattr(config, "RALLY_TYPE_A_END_DIFF_THRESHOLD", 6.0))
             swipe_x = int(gw_l + gw_w * 0.50)
-            swipe_y1 = int(gw_t + gw_h * 0.72)
-            swipe_y2 = int(gw_t + gw_h * 0.28)
-            _adb_swipe(adb, vp, swipe_x, swipe_y1, swipe_x, swipe_y2, 280, "Cuộn xem thêm Rally phía dưới", log_cb)
-            _sleep(0.40, stop_event)
+            swipe_y1 = int(gw_t + gw_h * getattr(config, "RALLY_TYPE_A_SWIPE_BOTTOM_Y", 0.740))
+            swipe_y2 = int(gw_t + gw_h * getattr(config, "RALLY_TYPE_A_SWIPE_TOP_Y", 0.260))
+            swipe_ms = int(getattr(config, "RALLY_TYPE_A_SWIPE_DURATION_MS", 380))
 
-            # Nhịp 2: Quét lại sau khi cuộn để bấm các Rally mới lộ ra
-            screen_crop2 = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
-            if screen_crop2 is not None:
-                green_btns_p2 = _get_green_btns(screen_crop2)
-                if green_btns_p2:
-                    for idx, (btn_x, btn_y) in enumerate(green_btns_p2):
+            prev_sig = _extract_sheet_body_sig(screen_crop)
+            last_sheet_frame = screen_crop
+            for scroll_idx in range(max_scrolls):
+                if stop_event.is_set():
+                    break
+                _adb_swipe(
+                    adb,
+                    vp,
+                    swipe_x,
+                    swipe_y1,
+                    swipe_x,
+                    swipe_y2,
+                    swipe_ms,
+                    f"Cuộn xem thêm Rally phía dưới ({scroll_idx + 1}/{max_scrolls})",
+                    log_cb,
+                )
+                if _sleep(0.45, stop_event):
+                    break
+
+                next_frame = safe_grab(sct, {"left": gw_l, "top": gw_t, "width": gw_w, "height": gw_h})
+                if next_frame is None or _is_chat_open(next_frame):
+                    break
+                last_sheet_frame = next_frame
+
+                next_btns = _get_green_btns(next_frame)
+                if next_btns:
+                    for idx, (btn_x, btn_y) in enumerate(next_btns):
                         if stop_event.is_set():
                             break
-                        _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally bổ sung {idx+1}/{len(green_btns_p2)}", log_cb)
+                        _adb_tap(adb, vp, gw_l + btn_x, gw_t + btn_y, f"Tham gia Rally bổ sung {idx+1}/{len(next_btns)}", log_cb)
                         joined_any = True
                         _sleep(0.35, stop_event)
+
+                next_sig = _extract_sheet_body_sig(next_frame)
+                if prev_sig is not None and next_sig is not None:
+                    page_diff = float(np.mean(np.abs(prev_sig - next_sig)))
+                    if page_diff < end_diff_thresh:
+                        break
+                prev_sig = next_sig
 
             if joined_any:
                 if _last_clicked_tile is not None:
@@ -384,7 +426,7 @@ def _handle_rally_detail_popup(
             # ngược lại bấm vùng mờ phía trên (0.70, 0.04) cho bảng cao hoặc (0.50, 0.12) cho bảng thấp.
             xb_y1, xb_y2 = int(gw_h * 0.915), int(gw_h * 0.985)
             xb_x1, xb_x2 = int(gw_w * 0.42), int(gw_w * 0.58)
-            xb_crop = screen_crop[xb_y1:xb_y2, xb_x1:xb_x2]
+            xb_crop = last_sheet_frame[xb_y1:xb_y2, xb_x1:xb_x2]
             closed_via_x = False
             if xb_crop.size > 0:
                 xb_mask = (xb_crop[:, :, 0] > 175) & (xb_crop[:, :, 1] > 175) & (xb_crop[:, :, 2] > 175)

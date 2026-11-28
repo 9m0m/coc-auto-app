@@ -1242,6 +1242,83 @@ class TestRallyCases(unittest.TestCase):
             vp_bot = vp_b_raw[:, ox_b:ox_b + rw_b]
             self.assertIsNone(rally._find_chat_scroll_bottom_button(vp_bot), "Ảnh eebec9e2 đang ở đáy không được nhận nhầm nút '>>'")
 
+    def test_case_29_type_a_16_plus_rallies_multi_scroll_and_dune_real_screens(self):
+        """Bảng Type A có 16+ Rally (cuộn 4-5 trang tới kèo xanh ở trang 4, tự dừng khi chạm đáy) + kiểm thử 5 ảnh Thành Phố Thất Lạc."""
+        def _make_sheet_page(seed: int, has_green: bool = False) -> np.ndarray:
+            f = self._create_blank_frame(bg_bgr=(115, 65, 85))
+            f[0:int(self.gw_h * 0.145), :] = (35, 28, 35)
+            f[int(self.gw_h * 0.145):int(self.gw_h * 0.195), :] = (46, 36, 44)
+            # Dải thẻ khác nhau theo từng trang để page_diff > end_diff_thresh khi cuộn thật
+            rng = np.random.default_rng(seed)
+            for row_i, y_rel in enumerate((0.26, 0.48, 0.70)):
+                cy1 = int(self.gw_h * y_rel)
+                cy2 = int(self.gw_h * (y_rel + 0.17))
+                tone = rng.integers(90, 230, size=(3,), dtype=np.uint8).tolist()
+                f[cy1:cy2, int(self.gw_w * 0.08):int(self.gw_w * 0.90)] = tone
+                if has_green and row_i == 1:
+                    f[cy1 + 40:cy1 + 85, int(self.gw_w * 0.60):int(self.gw_w * 0.88)] = (35, 200, 50)
+                else:
+                    f[cy1 + 40:cy1 + 85, int(self.gw_w * 0.60):int(self.gw_w * 0.88)] = (150, 150, 150)
+            f[int(self.gw_h * 0.915):self.gw_h, :] = (30, 22, 26)
+            f[int(self.gw_h * 0.935):int(self.gw_h * 0.97), int(self.gw_w * 0.47):int(self.gw_w * 0.53)] = (245, 245, 245)
+            return f
+
+        pages = [
+            _make_sheet_page(101, has_green=False),
+            _make_sheet_page(202, has_green=False),
+            _make_sheet_page(303, has_green=False),
+            _make_sheet_page(404, has_green=True),   # Trang 4 (Rally #11-#14) mới có nút xanh!
+            _make_sheet_page(505, has_green=False),  # Trang 5 (đáy danh sách)
+        ]
+
+        def mock_grab_pages(sct, mon):
+            idx = min(len(self.mock_adb.swipes), len(pages) - 1)
+            return make_mock_grab(pages[idx])(sct, mon)
+
+        self.mock_adb.clear()
+        with patch("modules.rally.safe_grab", side_effect=mock_grab_pages):
+            is_pop, is_join = rally._handle_rally_detail_popup(
+                None, self.vp, self.mock_adb, self.stop_event, allow_type_d_close_x=False
+            )
+        self.assertTrue(is_pop)
+        self.assertTrue(is_join, "Phải cuộn qua các trang xám để bấm được nút xanh ở trang 4")
+        # Phải dừng sớm khi tới đáy (trang 5 lặp lại), không cuộn thừa hết 7 nhịp
+        self.assertEqual(len(self.mock_adb.swipes), 5)
+        self.assertEqual(len(self.mock_adb.taps), 2)  # 1 tap nút xanh trang 4 + 1 tap [X] đóng bảng
+        self.assertAlmostEqual(self.mock_adb.taps[-1][1] / self.gw_h, 0.952, delta=0.03)
+
+        # Kiểm tra 5 ảnh thực tế Thành Phố Thất Lạc (20, 20)
+        real_paths = [
+            (True, r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795825419398_561c10b1.jpg"),
+            (True, r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795825424072_41bff43a.jpg"),
+            (True, r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795825430397_c2e804c0.jpg"),
+            (False, r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795825441018_58c2bc1a.jpg"),
+            (True, r"C:\Users\ADMIN\.gemini\antigravity\brain\f7ca2c33-7382-4daa-a7f1-a9f1c3d16480\.user_uploaded\media_1795825453547_efef6cd6.jpg"),
+        ]
+        for expect_pop, p_real in real_paths:
+            if not os.path.exists(p_real):
+                continue
+            raw_r = cv2.imread(p_real)
+            hr, wr = raw_r.shape[:2]
+            scr = max(wr / 443.0, hr / 761.0)
+            vp_r_raw = raw_r[int(32 * scr):hr, 0:wr - int(50 * scr)]
+            ox_r, rw_r = rally._detect_pillarbox(vp_r_raw)
+            vp_r = vp_r_raw[:, ox_r:ox_r + rw_r]
+            gh_r, gw_r = vp_r.shape[:2]
+            self.mock_adb.clear()
+            self.mock_adb.screen_size = (gw_r, gh_r)
+            with patch("modules.rally.safe_grab", side_effect=make_mock_grab(vp_r)):
+                ip, ij = rally._handle_rally_detail_popup(
+                    None, (0, 0, gw_r, gh_r), self.mock_adb, self.stop_event, allow_type_d_close_x=False
+                )
+            self.assertEqual(ip, expect_pop, f"Ảnh {os.path.basename(p_real)} expect_pop={expect_pop}")
+            self.assertFalse(ij)
+            if expect_pop:
+                self.assertEqual(len(self.mock_adb.taps), 1)
+                self.assertAlmostEqual(self.mock_adb.taps[0][1] / gh_r, 0.955, delta=0.04)
+            else:
+                self.assertEqual(len(self.mock_adb.taps), 0, "Mapview tuyệt đối không được bấm [X]!")
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestRallyCases)

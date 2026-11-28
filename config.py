@@ -276,6 +276,13 @@ PILLARBOX_BLACK_THRESHOLD: float = 12.0  # Ngưỡng độ sáng xác định d�
 PILLARBOX_MIN_MARGIN: int = 15           # Độ rộng lề tối thiểu (px) để kích hoạt loại trừ dải đen (tránh viền 1px)
 
 # F. Cấu hình thời gian chờ (Delays - Đơn vị: Giây)
+# Ngưỡng bảng danh sách nhiều Rally (Type A - hỗ trợ 16+ Rally trên 1 ô tại Dune)
+RALLY_TYPE_A_MAX_SCROLLS: int = 7
+RALLY_TYPE_A_SWIPE_TOP_Y: float = 0.260
+RALLY_TYPE_A_SWIPE_BOTTOM_Y: float = 0.740
+RALLY_TYPE_A_SWIPE_DURATION_MS: int = 380
+RALLY_TYPE_A_END_DIFF_THRESHOLD: float = 6.0
+
 # Thời gian giữ phím chuột (chạm cảm ứng Android an toàn)
 RALLY_DELAY_TAP_HOLD: float = 0.08
 
